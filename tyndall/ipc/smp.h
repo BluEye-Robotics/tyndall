@@ -11,7 +11,7 @@
 
 #define barrier() __asm__ __volatile__("": : :"memory")
 
-#if __arm__ // tuned for armv7 (32-bit)
+#if __arm__ || __aarch64__ // tuned for armv7 (32-bit)
 
 #define CACHELINE_BYTES 32
 // L1: https://developer.arm.com/documentation/ddi0388/f/Level-1-Memory-System/About-the-L1-memory-system
