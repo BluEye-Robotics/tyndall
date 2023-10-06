@@ -1,29 +1,25 @@
 #ifdef NO_ROS
 #include <cstdio>
-int main(){ printf("no ros\n"); }
+int main() { printf("no ros\n"); }
 #else
-#include <tyndall/ros_context.h>
-#include <cstdio>
-#include <csignal>
-#include <thread>
 #include <chrono>
-#include <std_srvs/SetBool.h>
+#include <csignal>
+#include <cstdio>
+#include <std_srvs/srv/set_bool.hpp>
+#include <thread>
+#include <tyndall/ros_context.h>
 
 sig_atomic_t run = 1;
 
-void signal_handler(int sig)
-{
-  run = 0;
-}
+void signal_handler(int sig) { run = 0; }
 
-int main(int argc, char** argv)
-{
-  ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_call");
+int main(int argc, char **argv) {
+  ros_context::init(argc, argv, std::chrono::milliseconds{3},
+                    "ex_ros_context_call");
 
   signal(SIGINT, signal_handler);
 
-  while(run)
-  {
+  while (run) {
     std_srvs::SetBool srv;
     srv.request.data = (bool)(run++ % 3);
 

@@ -146,11 +146,11 @@ Pub / sub example:
 
 ```cpp
 #include <tyndall/ros_context.h>
-#include <std_msgs/Int32.h>
+#include <std_msgs/msg/int32.h>
 
 ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_write");
 
-std_msgs::Int32 msg;
+std_msgs::msg::Int32 msg;
 msg.data = 42;
 
 ros_context_write(msg, "/ex_ros_context");
@@ -160,13 +160,13 @@ ros_context_write(msg, "/ex_ros_context");
 
 ```cpp
 #include <tyndall/ros_context.h>
-#include <std_msgs/Int32.h>
+#include <std_msgs/msg/int32.h>
 
 ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_read");
 
 while(1)
 {
-  std_msgs::Int32 msg;
+  std_msgs::msg::Int32 msg;
 
   int rc = ros_context_read(msg, "/ex_ros_context");
 
@@ -181,12 +181,12 @@ Serve / call example:
 
 ```cpp
 #include <tyndall/ros_context.h>
-#include <std_srvs/SetBool.h>
+#include <std_srvs/srv/set_bool.hpp>
 
 ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_serve");
 while(1)
 {
-  std_srvs::SetBool srv;
+  std_srvs::srv::SetBool srv;
   srv.response.success = true;
 
   int rc = ros_context_serve(srv, "ex_ros_context");
@@ -200,15 +200,15 @@ while(1)
 
 ```cpp
 #include <tyndall/ros_context.h>
-#include <std_srvs/SetBool.h>
+#include <std_srvs/srv/set_bool.hpp>
 
 ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_serve");
 while(1)
 {
-  std_srvs::SetBool srv;
+  std_srvs::srv::SetBool srv;
   srv.response.success = true;
 
-  std_srvs::SetBool srv;
+  std_srvs::srv::SetBool srv;
   srv.request.data = true;
 
   int rc = ros_context_call(srv, "/ex_ros_context_serve/ex_ros_context");
