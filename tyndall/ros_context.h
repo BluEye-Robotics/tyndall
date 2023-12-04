@@ -148,7 +148,7 @@ template <typename Service, typename Id> int lazy_serve(Service &srv, Id) {
   {
     std::lock_guard<typeof(save_mutex)> guard(save_mutex);
 
-    save.response = srv.response; // set new response
+    save.Response = srv.Response; // set new response
 
     if (new_save) {
       new_save = false;
@@ -177,8 +177,8 @@ template <typename Service, typename Id> int lazy_serve(Service &srv, Id) {
             [](typename Service::Request::SharedPtr req,
                typename Service::Response::SharedPtr rep) -> bool {
               std::lock_guard<typeof(save_mutex)> guard(save_mutex);
-              rep = save.response;
-              save.request = req;
+              rep = save.Response;
+              save.Request = req;
               new_save = true;
               valid_save = true;
               return true;
