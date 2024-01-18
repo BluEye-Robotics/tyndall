@@ -18,6 +18,8 @@ set(LD_FLAGS "-lpthread -lzmq -lprotobuf -lfmt -lrt -latomic")
 
 find_package(ament_cmake)
 find_package(rclcpp)
+find_package(std_msgs)
+find_package(std_srvs)
 find_package(builtin_interfaces)
 
 if("${rclcpp_FOUND}")
@@ -32,7 +34,7 @@ target_link_libraries(tyndall ${LD_FLAGS})
 install(TARGETS tyndall DESTINATION lib)
 
 if("${rclcpp_FOUND}")
-  ament_target_dependencies(tyndall rclcpp builtin_interfaces)
+  ament_target_dependencies(tyndall rclcpp builtin_interfaces std_msgs std_srvs)
 endif()
 
 file(GLOB HEADERS "tyndall/*.h*" "tyndall/*/*.h*")

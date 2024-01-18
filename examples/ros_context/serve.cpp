@@ -20,17 +20,18 @@ int main(int argc, char **argv) {
   signal(SIGINT, signal_handler);
 
   while (run) {
-    std_srvs::SetBool srv;
-    srv.response.success =
+    std_srvs::srv::SetBool::Request srv_req;
+    std_srvs::srv::SetBool::Response srv_resp;
+    srv_resp.success =
         (bool)(std::chrono::duration_cast<std::chrono::seconds>(
                    std::chrono::system_clock::now().time_since_epoch())
                    .count() %
                3);
 
-    int rc = ros_context_serve(srv, "ex_ros_context");
+    int rc = ros_context_serve(srv_req, srv_resp, "ex_ros_context");
 
     if (rc == 0)
-      printf("read: %d\n", srv.request.data);
+      printf("read: %d\n", srv_req.data);
 
     std::this_thread::sleep_for(std::chrono::milliseconds{3});
   }

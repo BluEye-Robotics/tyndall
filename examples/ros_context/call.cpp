@@ -20,13 +20,15 @@ int main(int argc, char **argv) {
   signal(SIGINT, signal_handler);
 
   while (run) {
-    std_srvs::SetBool srv;
-    srv.request.data = (bool)(run++ % 3);
+    std_srvs::srv::SetBool::Request srv_req;
+    std_srvs::srv::SetBool::Response srv_resp;
+    srv_req.data = (bool)(run++ % 3);
 
-    int rc = ros_context_call(srv, "/ex_ros_context_serve/ex_ros_context");
+    int rc = ros_context_call(srv_req, srv_resp,
+                              "/ex_ros_context_serve/ex_ros_context");
 
     if (rc == 0)
-      printf("req rep: %d %d\n", srv.request.data, srv.response.success);
+      printf("req rep: %d %d\n", srv_req.data, srv_resp.success);
     else
       printf("response error\n");
 

@@ -5,6 +5,7 @@
 #include <optional>
 #include <stdint.h>
 #include <thread>
+
 #ifdef NO_ROS
 // mock
 namespace ros_context {
@@ -137,8 +138,11 @@ void lazy_write(const Message &msg, Id) {
 
 // Ros service based methods
 
-template <typename Service, typename Id> int lazy_serve(Service &srv, Id) {
-  static Service save;
+template <typename Service, typename Id>
+int lazy_serve(typename Service::Request &srv_req,
+               typename Service::Response &srv_resp) {
+  static typename Service::Request save_req;
+  static typename Service::Response save_resp;
   static std::mutex save_mutex;
   static bool new_save = false;
   static bool valid_save = false;
@@ -148,14 +152,17 @@ template <typename Service, typename Id> int lazy_serve(Service &srv, Id) {
   {
     std::lock_guard<typeof(save_mutex)> guard(save_mutex);
 
-    save.Response = srv.Response; // set new response
+    save_req = srv_req;
+    save_resp = srv_resp; // set new response
 
     if (new_save) {
       new_save = false;
-      srv = save;
+      srv_req = save_req;
+      srv_resp = save_resp;
       rc = 0;
     } else if (valid_save) {
-      srv = save;
+      srv_req = save_req;
+      srv_resp = save_resp;
       rc = -1;
       errno = EAGAIN;
     } else {
@@ -172,13 +179,13 @@ template <typename Service, typename Id> int lazy_serve(Service &srv, Id) {
 
     static auto server = nh->create_service<Service>(
         Id::c_str(),
-        std::function<bool(typename Service::Request req,
-                           typename Service::Response rep)>(
+        std::function<bool(typename Service::Request::SharedPtr,
+                           typename Service::Response::SharedPtr)>(
             [](typename Service::Request::SharedPtr req,
                typename Service::Response::SharedPtr rep) -> bool {
               std::lock_guard<typeof(save_mutex)> guard(save_mutex);
-              rep = save.Response;
-              save.Request = req;
+              *rep = save_resp;
+              save_req = *req;
               new_save = true;
               valid_save = true;
               return true;
@@ -188,14 +195,21 @@ template <typename Service, typename Id> int lazy_serve(Service &srv, Id) {
   return rc;
 }
 
-template <typename Service, typename Id> int lazy_call(Service &srv, Id) {
+template <typename Service, typename Id>
+int lazy_call(typename Service::Request &srv_req,
+              typename Service::Response &srv_resp, Id) {
   static auto client = nh->create_client<Service>(Id::c_str());
 
   if (!client.isValid()) {
     client = nh->create_client<Service>(Id::c_str());
   }
-
-  return client.call(srv) ? 0 : -1;
+  auto result = client->async_send_request(srv_req);
+  if (rclcpp::spin_until_future_complete(nh, result) ==
+      rclcpp::FutureReturnCode::SUCCESS) {
+    srv_resp = result.get();
+    return 0;
+  }
+  return 1;
 }
 } // namespace ros_context
 
@@ -203,8 +217,25 @@ template <typename Service, typename Id> int lazy_call(Service &srv, Id) {
 
 #define ros_context_write(msg, id) ros_context::lazy_write(msg, id##_strval)
 
-#define ros_context_serve(srv, id) ros_context::lazy_serve(srv, id##_strval)
+template <typename Service, typename Id>
+int ros_context_serve(typename Service::Request &srv_req,
+                      typename Service::Response &srv_resp) {
+  return ros_context::lazy_serve<Service, Id>(srv_req, srv_resp);
+}
 
-#define ros_context_call(srv, id) ros_context::lazy_call(srv, id##_strval)
+template <typename Service, typename Id>
+int ros_context_serve(typename Service::Request &srv_req,
+                      typename Service::Response &srv_resp, Id) {
+  return ros_context::lazy_serve<Service, Id>(srv_req, srv_resp);
+}
+
+template <typename Request, typename Response>
+int ros_context_call(Request &srv_req, Response &srv_resp, const char *id) {
+  using Service = typename std::decay<decltype(srv_req)>::type;
+  return ros_context::lazy_call<Service>(srv_req, srv_resp, strval(id));
+}
+
+#define ros_context_call(srv_req, srv_resp, id)                                \
+  ros_context::lazy_call(srv_req, srv_resp, id##_strval)
 
 #endif

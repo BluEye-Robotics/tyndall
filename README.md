@@ -192,7 +192,7 @@ while(1)
   int rc = ros_context_serve(srv, "ex_ros_context");
 
   if (rc == 0)
-    printf("got: %d\n", srv.request.data);
+    printf("got: %d\n", srv_req.data);
 }
 ```
 
