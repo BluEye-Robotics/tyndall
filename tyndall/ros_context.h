@@ -136,106 +136,10 @@ void lazy_write(const Message &msg, Id) {
   pub->publish(msg);
 }
 
-// Ros service based methods
-
-template <typename Service, typename Id>
-int lazy_serve(typename Service::Request &srv_req,
-               typename Service::Response &srv_resp) {
-  static typename Service::Request save_req;
-  static typename Service::Response save_resp;
-  static std::mutex save_mutex;
-  static bool new_save = false;
-  static bool valid_save = false;
-
-  // handle service data
-  int rc;
-  {
-    std::lock_guard<typeof(save_mutex)> guard(save_mutex);
-
-    save_req = srv_req;
-    save_resp = srv_resp; // set new response
-
-    if (new_save) {
-      new_save = false;
-      srv_req = save_req;
-      srv_resp = save_resp;
-      rc = 0;
-    } else if (valid_save) {
-      srv_req = save_req;
-      srv_resp = save_resp;
-      rc = -1;
-      errno = EAGAIN;
-    } else {
-      rc = -1;
-      errno = ENOMSG;
-    }
-  }
-
-  // register ros callback
-  static bool must_initialize_callback = true;
-  if (must_initialize_callback) {
-    must_initialize_callback = false;
-    std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
-
-    static auto server = nh->create_service<Service>(
-        Id::c_str(),
-        std::function<bool(typename Service::Request::SharedPtr,
-                           typename Service::Response::SharedPtr)>(
-            [](typename Service::Request::SharedPtr req,
-               typename Service::Response::SharedPtr rep) -> bool {
-              std::lock_guard<typeof(save_mutex)> guard(save_mutex);
-              *rep = save_resp;
-              save_req = *req;
-              new_save = true;
-              valid_save = true;
-              return true;
-            }));
-  }
-
-  return rc;
-}
-
-template <typename Service, typename Id>
-int lazy_call(typename Service::Request &srv_req,
-              typename Service::Response &srv_resp, Id) {
-  static auto client = nh->create_client<Service>(Id::c_str());
-
-  if (!client.isValid()) {
-    client = nh->create_client<Service>(Id::c_str());
-  }
-  auto result = client->async_send_request(srv_req);
-  if (rclcpp::spin_until_future_complete(nh, result) ==
-      rclcpp::FutureReturnCode::SUCCESS) {
-    srv_resp = result.get();
-    return 0;
-  }
-  return 1;
-}
 } // namespace ros_context
 
 #define ros_context_read(msg, id) ros_context::lazy_read(msg, id##_strval)
 
 #define ros_context_write(msg, id) ros_context::lazy_write(msg, id##_strval)
-
-template <typename Service, typename Id>
-int ros_context_serve(typename Service::Request &srv_req,
-                      typename Service::Response &srv_resp) {
-  return ros_context::lazy_serve<Service, Id>(srv_req, srv_resp);
-}
-
-template <typename Service, typename Id>
-int ros_context_serve(typename Service::Request &srv_req,
-                      typename Service::Response &srv_resp, Id) {
-  return ros_context::lazy_serve<Service, Id>(srv_req, srv_resp);
-}
-
-template <typename Request, typename Response>
-int ros_context_call(Request &srv_req, Response &srv_resp, const char *id) {
-  using Service = typename std::decay<decltype(srv_req)>::type;
-  return ros_context::lazy_call<Service>(srv_req, srv_resp, strval(id));
-}
-
-#define ros_context_call(srv_req, srv_resp, id)                                \
-  ros_context::lazy_call(srv_req, srv_resp, id##_strval)
 
 #endif
