@@ -9,7 +9,7 @@
 #ifdef NO_ROS
 // mock
 namespace ros_context {
-static inline int shutdown() { return 0; }
+static inline void spin() {}
 static inline int
 init(int argc, char **argv,
      std::chrono::milliseconds loop_sleep = std::chrono::milliseconds{3},
@@ -39,26 +39,14 @@ init(int argc, char **argv,
 // thread safe interface. lazy initialization of ros communication objects is
 // used for ease of use
 namespace ros_context {
-extern rclcpp::Node::SharedPtr nh;
+extern std::weak_ptr<rclcpp::Node> nh;
 extern std::mutex ros_mutex;
-extern std::thread ros_thread;
-extern int run_ros;
-
-// methods
-
-static inline int shutdown() {
-  run_ros = 0;
-  ros_thread.join();
-
-  rclcpp::shutdown();
-  return 0;
-}
 
 static inline int
 init(int argc, char **argv,
      std::chrono::milliseconds loop_sleep = std::chrono::milliseconds{3},
      const char *node_name = "default_node_name") {
-  assert(nh == NULL); // enforce single initialization per process
+  // assert(nh == NULL); // enforce single initialization per process
 
   rclcpp::init(argc, argv);
 
@@ -66,20 +54,12 @@ init(int argc, char **argv,
       std::make_shared<rclcpp::Node>(node_name);
   nh = nh_new;
 
-  static struct lifetime_t {
-    ~lifetime_t() { shutdown(); }
-  } lifetime;
-
-  ros_thread = std::thread([loop_sleep]() {
-    while (run_ros) {
-      {
-        std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
-        rclcpp::spin_some(nh);
-      }
-      std::this_thread::sleep_for(loop_sleep);
-    }
-  });
   return 0;
+}
+
+static inline void spin() {
+  // std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
+  rclcpp::spin(nh.lock());
 }
 
 template <typename Message, typename Id> int lazy_read(Message &msg, Id) {
@@ -92,9 +72,8 @@ template <typename Message, typename Id> int lazy_read(Message &msg, Id) {
   static bool must_initialize_callback = true;
   if (must_initialize_callback) {
     must_initialize_callback = false;
-    std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
-
-    static auto sub = nh->create_subscription<Message>(
+    // std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
+    static auto sub = nh.lock()->create_subscription<Message>(
         Id::c_str(), 1,
         std::function<void(const typename Message::ConstSharedPtr)>(
             [](const typename Message::ConstSharedPtr sub_msg) -> void {
@@ -131,8 +110,8 @@ void lazy_write(const Message &msg, Id) {
   static rclcpp::QoS qos_profile(1);
   qos_profile.transient_local();
   static rclcpp::PublisherOptions pub_options;
-  static auto pub =
-      nh->create_publisher<Message>(Id::c_str(), qos_profile, pub_options);
+  static auto pub = nh.lock()->create_publisher<Message>(
+      Id::c_str(), qos_profile, pub_options);
   pub->publish(msg);
 }
 

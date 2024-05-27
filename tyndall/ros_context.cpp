@@ -3,7 +3,7 @@
 
 #ifndef NO_ROS
 namespace ros_context {
-rclcpp::Node::SharedPtr nh;
+std::weak_ptr<rclcpp::Node> nh;
 std::mutex ros_mutex;
 std::thread ros_thread;
 int run_ros = 1;
