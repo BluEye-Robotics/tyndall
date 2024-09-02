@@ -4,11 +4,11 @@
 #include <tyndall/ros_context.h>
 #include <unistd.h>
 #ifdef NO_ROS
-namespace std_msgs {
+namespace std_msgs::msg {
 struct Int32 {
   int data;
 };
-} // namespace std_msgs
+} // namespace std_msgs::msg
 #else
 #include <std_msgs/msg/int32.hpp>
 #endif
