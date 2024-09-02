@@ -23,8 +23,10 @@ find_package(std_srvs)
 find_package(builtin_interfaces)
 
 if("${rclcpp_FOUND}")
+  message(STATUS "ROS2 found")
   set(LD_FLAGS "${LD_FLAGS} -lpthread")
 else()
+  message(STATUS "ROS2 not found")
   add_definitions("-DNO_ROS")
 endif()
 
