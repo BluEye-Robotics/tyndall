@@ -58,8 +58,16 @@ init(int argc, char **argv,
 }
 
 static inline void spin() {
-  // std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
-  rclcpp::spin(nh.lock());
+  rclcpp::experimental::executors::EventsExecutor executor;
+
+  // Add the node to the executor
+  executor.add_node(nh.lock());
+
+  // Spin the executor
+  executor.spin();
+
+  // Remove the node from the executor after spinning
+  executor.remove_node(nh.lock());
 }
 
 template <typename Message, typename Id> int lazy_read(Message &msg, Id) {
