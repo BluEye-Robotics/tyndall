@@ -36,6 +36,9 @@ const i32 ref = []() {
 int main() {
   ros_context::init(0, NULL, std::chrono::milliseconds{3}, "test_ros_context");
 
+  // Create a thread to run ros_context::spin
+  std::thread spin_thread([]() { ros_context::spin(); });
+
   {
     {
       i32 entry = ref;
@@ -43,7 +46,7 @@ int main() {
     }
 
     {
-      i32 entry = {}, tmp;
+      i32 entry, tmp;
       ros_context_read(tmp, "/test/standard");
       sleep(1);
       int rc = ros_context_read(entry, "/test/standard");
@@ -51,6 +54,8 @@ int main() {
       check(entry == ref);
     }
   }
+  rclcpp::shutdown();
+  spin_thread.join();
 
 #ifdef NO_ROS
   ipc_cleanup();
