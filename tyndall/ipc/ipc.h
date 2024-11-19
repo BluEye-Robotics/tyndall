@@ -15,11 +15,17 @@
 #define ipc_write(entry, id) ipc_lazy_write(entry, id##_strval)
 
 // ipc_read return value: 0 on success, -1 on failure.
+// Optional third argument: always_update_entry (default: true).
 // On failure, ERRNO is ENOMSG or EAGAIN.
 // ENOMSG means there is no message available.
 // EAGAIN means there is no new message available, and the last message received
 // will be returned instead.
-#define ipc_read(entry, id) ipc_lazy_read(entry, id##_strval)
+#define IPC_READ_2_ARGS(entry, id) ipc_lazy_read(entry, id##_strval, true)
+#define IPC_READ_3_ARGS(entry, id, always_update_entry)                        \
+  ipc_lazy_read(entry, id##_strval, always_update_entry)
+#define IPC_MACRO_CHOOSER(_1, _2, _3, NAME, ...) NAME
+#define ipc_read(...)                                                          \
+  IPC_MACRO_CHOOSER(__VA_ARGS__, IPC_READ_3_ARGS, IPC_READ_2_ARGS)(__VA_ARGS__)
 
 template <typename STORAGE, typename ID>
 using ipc_writer = shmem_buf<seq_lock<STORAGE>, SHMEM_WRITE, id_prepare<ID>>;
@@ -39,10 +45,10 @@ static inline void ipc_lazy_write(const STORAGE &entry, ID) {
 }
 
 template <typename STORAGE, typename ID>
-static inline int ipc_lazy_read(STORAGE &entry, ID) {
+static inline int ipc_lazy_read(STORAGE &entry, ID, bool always_update_entry) {
   static ipc_reader<STORAGE, ID> reader;
 
-  return reader.read(entry);
+  return reader.read(entry, always_update_entry);
 }
 
 #endif

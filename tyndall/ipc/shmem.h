@@ -88,7 +88,7 @@ concept shmem_data_structure = requires(
   }
   -> std::same_as<void>; // void return type since we don't expect fail on send
   {
-    ds.read(storage, state)
+    ds.read(storage, state, true)
   } -> std::same_as<int>; // return value: 0 is success, -1 is error, errno is
                           // ENOMSG, EAGAIN
 
@@ -176,9 +176,9 @@ public:
     data_structure().write(entry, state);
   }
 
-  int read(storage &entry) noexcept {
+  int read(storage &entry, bool always_update_entry = true) noexcept {
     static_assert(PERMISSIONS & SHMEM_READ, "needs read permission");
-    return data_structure().read(entry, state);
+    return data_structure().read(entry, state, always_update_entry);
   }
 
   // disable copy
