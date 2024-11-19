@@ -80,13 +80,18 @@ public:
     seq_lock_write_end(&this->seq, seq);
   }
 
-  int read(STORAGE &entry, seq_lock_state &state) {
+  int read(STORAGE &entry, seq_lock_state &state,
+           bool always_update_entry = true) {
     int rc;
     unsigned seq1;
 
     do {
       seq1 = seq_lock_read_begin(&this->seq);
-      entry = this->entry;
+      if (seq1 != state.prev_seq || always_update_entry) {
+        {
+          entry = this->entry;
+        }
+      }
 
     } while (seq_lock_read_retry(&this->seq, seq1));
 
