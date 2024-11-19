@@ -9,20 +9,14 @@
 
 int run = 1;
 
-void sig_handler(int sig)
-{
-  run = 0;
-}
+void sig_handler(int sig) { run = 0; }
 
-
-int main()
-{
+int main() {
   signal(SIGINT, sig_handler);
 
   my_struct entry = {};
 
-  while (run)
-  {
+  while (run) {
     ipc_write(entry, "/my/topic");
 
     my_struct_inc(entry);

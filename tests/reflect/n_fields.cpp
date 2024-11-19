@@ -1,13 +1,11 @@
-#include <tyndall/reflect/n_fields.h>
 #include <array>
+#include <tyndall/reflect/n_fields.h>
 
 #include <string>
 
-int main()
-{
+int main() {
   {
-    struct S
-    {
+    struct S {
       float floating_point = 3.14f;
       int integer = 42;
       unsigned char unsigned_char = 255;
@@ -19,5 +17,4 @@ int main()
 
     static_assert(n_fields<decltype(s)>() == 5);
   }
-
 }

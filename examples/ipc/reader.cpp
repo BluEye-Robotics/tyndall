@@ -9,27 +9,18 @@
 
 int run = 1;
 
-void sig_handler(int sig)
-{
-  run = 0;
-}
+void sig_handler(int sig) { run = 0; }
 
-
-int main()
-{
+int main() {
   signal(SIGINT, sig_handler);
 
-
-  while (run)
-  {
+  while (run) {
     my_struct entry;
 
-    if (ipc_read(entry, "/my/topic") == 0)
-    {
+    if (ipc_read(entry, "/my/topic") == 0) {
       debug("new entry:\t");
       my_struct_print(debug_plain, entry, "\n");
-    }
-    else
+    } else
       debug_error("no entry\n");
 
     usleep(3 * 1000);

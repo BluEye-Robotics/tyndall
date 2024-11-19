@@ -1,19 +1,25 @@
-#include <tyndall/proto/zmq_proto.h>
-#include <google/protobuf/wrappers.pb.h>
-#include <tyndall/meta/macro.h>
-#include <thread>
 #include <assert.h>
+#include <google/protobuf/wrappers.pb.h>
+#include <thread>
+#include <tyndall/meta/macro.h>
+#include <tyndall/proto/zmq_proto.h>
 
-#define check(cond) do { if (!(cond)){ printf( __FILE__ ":" M_STRINGIFY(__LINE__) " " "Assertion failed: " #cond "\n"); exit(1); }} while(0)
+#define check(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf(__FILE__ ":" M_STRINGIFY(__LINE__) " "                            \
+                                                "Assertion failed: " #cond     \
+                                                "\n");                         \
+      exit(1);                                                                 \
+    }                                                                          \
+  } while (0)
 
-int main()
-{
+int main() {
   zmq_proto::context_t context{1};
   zmq_proto::socket_t<zmq_proto::PUB> pub(context, "tcp://*:5444");
   zmq_proto::socket_t<zmq_proto::SUB> sub(context, "tcp://127.0.0.1:5444");
 
-  std::thread sub_thread([&sub]()
-  {
+  std::thread sub_thread([&sub]() {
     google::protobuf::Int32Value msg;
     msg.set_value(0);
 
@@ -24,8 +30,7 @@ int main()
 
   std::this_thread::sleep_for(std::chrono::milliseconds{50});
 
-  std::thread pub_thread([&pub]()
-  {
+  std::thread pub_thread([&pub]() {
     google::protobuf::Int32Value msg;
     msg.set_value(42);
 
