@@ -72,6 +72,15 @@ public:
   using storage = STORAGE;
   using state = seq_lock_state;
 
+  /**
+   * @brief Write the data
+   *
+   * Only one writer is allowed in the whole system. The writer is always
+   * allowed to write.
+   *
+   * @param entry The storage object to write
+   * @param state The state object to keep track of the write
+   */
   void write(const STORAGE &entry, seq_lock_state &) {
     unsigned seq = seq_lock_write_begin(&this->seq);
 
@@ -80,6 +89,33 @@ public:
     seq_lock_write_end(&this->seq, seq);
   }
 
+  /**
+   * @brief Read the stored data
+   *
+   * Multiple reads can be done in parallel from the same process. The reader
+   * always gets the most recent entry. If a write is in progress, the reader
+   * will retry until the write is complete.
+   *
+   * Reading the same entry multiple times will return the same entry but will
+   * return -1 and set errno to EAGAIN if the entry has not been written to yet.
+   * Separate processes will each be allowed to read the entry once before
+   * getting EAGAIN.
+   *
+   * If the entry has never been written to, -1 is returned and errno is set to
+   * ENOMSG.
+   *
+   * The optimization using the optional always_update_entry parameter reduces
+   * copying when the entry is not updated. This optiziation assumes that
+   * the caller keeps the previous value in memory, as a static variable or
+   * class member.
+   *
+   * @param entry The storage object to read into
+   * @param state The state object to keep track of the read
+   * @param always_update_entry If true, the entry will be updated even if
+   * returning the same value as a previous call. If false, the output entry
+   * will only be updated if the stored entry is new.
+   * @return int 0 on success, -1 on error, errno is ENOMSG, EAGAIN
+   */
   int read(STORAGE &entry, seq_lock_state &state,
            bool always_update_entry = true) {
     int rc;
@@ -88,9 +124,7 @@ public:
     do {
       seq1 = seq_lock_read_begin(&this->seq);
       if (seq1 != state.prev_seq || always_update_entry) {
-        {
-          entry = this->entry;
-        }
+        entry = this->entry;
       }
 
     } while (seq_lock_read_retry(&this->seq, seq1));

@@ -79,6 +79,20 @@ enum shmem_permission {
   SHMEM_WRITE = 1 << 1,
 };
 
+/**
+ * @brief Concept for shared memory data structures
+ *
+ * Restricts DATA_STRUCTURE to have a storage type, state and the following
+ * methods:
+ * - void write(typename DATA_STRUCTURE::storage, typename
+ * DATA_STRUCTURE::state)
+ * - int read(typename DATA_STRUCTURE::storage, typename DATA_STRUCTURE::state,
+ * bool)
+ *
+ * seq_lock is a shared memory data structure that follows this concept.
+ *
+ * @tparam DATA_STRUCTURE
+ */
 template <typename DATA_STRUCTURE>
 concept shmem_data_structure = requires(
     DATA_STRUCTURE ds, typename DATA_STRUCTURE::storage storage,
@@ -95,11 +109,22 @@ concept shmem_data_structure = requires(
   { typename DATA_STRUCTURE::state{} };
 };
 
+/**
+ * @brief Shared memory buffer for IPC
+ *
+ * @tparam DATA_STRUCTURE The data structure to store in the shared memory
+ * buffer (e.g. seq_lock). Must fulfill the shmem_data_structure concept.
+ * @tparam PERMISSIONS The permissions for the shared memory buffer
+ * @tparam ID The id for the shared memory buffer
+ */
 template <typename DATA_STRUCTURE, int PERMISSIONS, typename ID = strval_t("")>
   requires shmem_data_structure<DATA_STRUCTURE> && (ID::is_strval())
 class shmem_buf {
+  /// @brief Shared memory buffer for IPC
   void *buf;
+  /// @brief State for the data structure
   typename DATA_STRUCTURE::state state;
+  /// @brief Type stored in the shared memory buffer
   using storage = typename DATA_STRUCTURE::storage;
 
 public:
@@ -117,6 +142,12 @@ public:
     init(id);
   }
 
+  /**
+   * @brief Convenience function to access the data structure from the shared
+   * memory buffer
+   *
+   * @return DATA_STRUCTURE& The data structure (e.g. seq_lock)
+   */
   DATA_STRUCTURE &data_structure() noexcept {
     return *static_cast<DATA_STRUCTURE *>(buf);
   }
@@ -171,11 +202,25 @@ public:
 
   ~shmem_buf() noexcept { uninit(); }
 
+  /**
+   * @brief Write the data to the shared memory buffer
+   *
+   * @param entry The storage object to write
+   */
   void write(const storage &entry) noexcept {
     static_assert(PERMISSIONS & SHMEM_WRITE, "needs write permission");
     data_structure().write(entry, state);
   }
 
+  /**
+   * @brief Read the stored data from the shared memory buffer
+   *
+   * @param entry The storage object to read into
+   * @param always_update_entry  If true, the entry will be updated even if
+   * returning the same value as a previous call. If false, the output entry
+   * will only be updated if the stored entry is new.
+   * @return int 0 on success, -1 on error, errno is ENOMSG, EAGAIN
+   */
   int read(storage &entry, bool always_update_entry = true) noexcept {
     static_assert(PERMISSIONS & SHMEM_READ, "needs read permission");
     return data_structure().read(entry, state, always_update_entry);
