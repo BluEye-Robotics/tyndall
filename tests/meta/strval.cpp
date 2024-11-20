@@ -1,12 +1,10 @@
-#include <tyndall/meta/strval.h>
-#include <type_traits>
-#include <cstring>
 #include <cassert>
+#include <cstring>
+#include <tyndall/meta/strval.h>
 #include <tyndall/meta/typeinfo.h>
+#include <type_traits>
 
-
-int main()
-{
+int main() {
   constexpr auto hei = "hei"_strval;
   decltype(hei)::c_str();
   static_assert(hei.get<0>() == 'h');
@@ -24,10 +22,9 @@ int main()
   {
     char buf[100];
     memset(buf, 0, sizeof(buf));
-    void* buf_p = buf;
-    auto hei_p = static_cast<std::remove_cvref_t<decltype(hei)>*>(buf_p);
+    void *buf_p = buf;
+    auto hei_p = static_cast<std::remove_cvref_t<decltype(hei)> *>(buf_p);
     *hei_p = {};
     assert(strcmp(buf, hei.c_str()) == 0);
   }
-
 }

@@ -1,8 +1,8 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
-#include <unistd.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <tyndall/ipc/ipc.h>
 #define debug_stdout stdout
@@ -11,59 +11,63 @@
 
 #define len(array) (int)(sizeof(array) / sizeof(array[0]))
 
-typedef struct
-{
-  const char * const name;
-  int respawn;  // respawn on error: -1 = infinite , 0 = never, 1 = once, 2 = twice, etc.
+typedef struct {
+  const char *const name;
+  int respawn; // respawn on error: -1 = infinite , 0 = never, 1 = once, 2 =
+               // twice, etc.
 
-// internal
+  // internal
   pid_t pid;
   int alive;
-  char* args[10]; // increase as needed
+  char *args[10]; // increase as needed
 
 } child;
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wwrite-strings" // ref https://gcc.gnu.org/bugzilla/show_bug.cgi?id=94554
+#pragma GCC diagnostic ignored                                                 \
+    "-Wwrite-strings" // ref https://gcc.gnu.org/bugzilla/show_bug.cgi?id=94554
 
-child children[] =
-{
-//==================== FILL IN PROCESSES ====================
-  {
-    .name = "/usr/bin/tyndall_ex_ipc_writer",
-    .respawn = -1,
-  },
-  {
-    .name = "/usr/bin/tyndall_ex_ipc_reader",
-    .args = { "--my_option", "--my_other_option", },
-  },
-//===========================================================
+child children[] = {
+    //==================== FILL IN PROCESSES ====================
+    {
+        .name = "/usr/bin/tyndall_ex_ipc_writer",
+        .respawn = -1,
+    },
+    {
+        .name = "/usr/bin/tyndall_ex_ipc_reader",
+        .args =
+            {
+                "--my_option",
+                "--my_other_option",
+            },
+    },
+    //===========================================================
 };
 #define n_children len(children)
 
 #pragma GCC diagnostic pop
 
 //==================== STATUSES THAT BYPASS RESPAWN =========
-// Children that are configured to respawn will not be respawned if they return with these statuses:
-int respawn_bypass_statuses[] = { 0, SIGINT };
+// Children that are configured to respawn will not be respawned if they return
+// with these statuses:
+int respawn_bypass_statuses[] = {0, SIGINT};
 //===========================================================
 
-int fork_child(child *c)
-{
+int fork_child(child *c) {
   pid_t pid = fork();
 
   debug_assert(pid != -1, return 1);
 
-  if (pid == 0)
-  {
-    debug("child %u (%s) was spawned by parent %u\n", getpid(), c->name, getppid());
+  if (pid == 0) {
+    debug("child %u (%s) was spawned by parent %u\n", getpid(), c->name,
+          getppid());
 
     setpgid(0, 0); // switch process group so ctrl-c only interrupts god
 
-    char * child_argv[len(c->args) + 2];
-    child_argv[0] = (char*)(c->name);
-    for (int i=0; i < len(c->args); ++i)
-      child_argv[i+1] = c->args[i];
+    char *child_argv[len(c->args) + 2];
+    child_argv[0] = (char *)(c->name);
+    for (int i = 0; i < len(c->args); ++i)
+      child_argv[i + 1] = c->args[i];
     child_argv[len(c->args) + 1] = NULL;
 
     int rc = execv(c->name, child_argv);
@@ -77,16 +81,13 @@ int fork_child(child *c)
   return 0;
 }
 
-void exit_handler(int sig)
-{
+void exit_handler(int sig) {
   debug("got signal %d\n", sig);
 
   // kill the children manually, since they're in a different group
   signal(SIGCHLD, SIG_IGN);
-  for (int i=0; i < n_children; ++i)
-  {
-    if (children[i].alive)
-    {
+  for (int i = 0; i < n_children; ++i) {
+    if (children[i].alive) {
       debug("killing %u (%s)\n", children[i].pid, children[i].name);
       debug_assert(kill(children[i].pid, sig) == 0);
     }
@@ -99,8 +100,7 @@ void exit_handler(int sig)
   exit(sig);
 }
 
-void child_handler(int sig)
-{
+void child_handler(int sig) {
   pid_t pid = -1;
   int status;
 
@@ -118,17 +118,15 @@ void child_handler(int sig)
   c->alive = 0;
   debug("child %u (%s) exited with status %d\n", c->pid, c->name, status);
 
-  if ((c->respawn != 0))
-  {
+  if ((c->respawn != 0)) {
     int bypass_statuses = 0;
-    for (int i=0; i < len(respawn_bypass_statuses); ++i)
+    for (int i = 0; i < len(respawn_bypass_statuses); ++i)
       if (status == respawn_bypass_statuses[i])
         ++bypass_statuses;
 
     if (bypass_statuses)
       debug("respawn bypassed\n");
-    else
-    {
+    else {
       debug("respawning child\n");
       fork_child(c);
 
@@ -137,11 +135,10 @@ void child_handler(int sig)
   }
 }
 
-int main()
-{
+int main() {
   debug("starting %u (god process)\n", getpid());
 
-  for (int i=0; i < n_children; ++i)
+  for (int i = 0; i < n_children; ++i)
     fork_child(children + i);
 
   debug("%u (god process) finished spawning threads\n", getpid());
@@ -149,7 +146,7 @@ int main()
   signal(SIGINT, exit_handler);
   signal(SIGCHLD, child_handler);
 
-  while(1)
+  while (1)
     pause();
 
   return 0;

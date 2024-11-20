@@ -1,24 +1,20 @@
-#include <tyndall/proto/binlog.h>
+#include <cstdio>
 #include <google/protobuf/wrappers.pb.h>
 #include <thread>
-#include <cstdio>
+#include <tyndall/proto/binlog.h>
 
-int main()
-{
+int main() {
   int binlog_fd = binlog_open("log.bin");
-  if (binlog_fd == -1)
-  {
+  if (binlog_fd == -1) {
     printf("errno: %s\n", strerror(errno));
     exit(1);
   }
 
-  while(1)
-  {
+  while (1) {
     google::protobuf::Int32Value msg;
 
     int rc = binlog_read(binlog_fd, msg);
-    if (rc != 0)
-    {
+    if (rc != 0) {
       printf("errno: %s\n", strerror(errno));
       exit(1);
     }
