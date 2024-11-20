@@ -41,6 +41,12 @@ int main() {
 
   {
     {
+      i32 tmp;
+      int rc = ros_context_read(tmp, "/test/standard");
+      check((rc == -1) && (errno == ENOMSG));
+    }
+
+    {
       i32 entry = ref;
       ros_context_write(entry, "/test/standard");
     }
