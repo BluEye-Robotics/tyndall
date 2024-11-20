@@ -96,18 +96,17 @@ public:
    * always gets the most recent entry. If a write is in progress, the reader
    * will retry until the write is complete.
    *
-   * Reading the same entry multiple times will return the same entry but will
-   * return -1 and set errno to EAGAIN if the entry has not been written to yet.
-   * Separate processes will each be allowed to read the entry once before
-   * getting EAGAIN.
+   * Reading the same entry multiple times will return the same entry the same
+   * entry unless always_update_entry is set to false. This returns -1 and sets
+   * errno to EAGAIN. Separate processes will each be allowed to read the entry
+   * once before getting EAGAIN.
    *
    * If the entry has never been written to, -1 is returned and errno is set to
    * ENOMSG.
    *
-   * The optimization using the optional always_update_entry parameter reduces
-   * copying when the entry is not updated. This optiziation assumes that
-   * the caller keeps the previous value in memory, as a static variable or
-   * class member.
+   * Setting the always_update_entry parameter to false prevents copying the
+   * entry if it is not updated with a new value. A suggested pattern is keeping
+   * the previous value in memory, as a static variable or class member.
    *
    * @param entry The storage object to read into
    * @param state The state object to keep track of the read
