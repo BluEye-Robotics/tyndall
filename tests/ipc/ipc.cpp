@@ -2,34 +2,36 @@
 #include <tyndall/ipc/ipc.h>
 #include <tyndall/meta/macro.h>
 
-struct my_struct
-{
+struct my_struct {
   long a;
   double b;
   char c;
   unsigned long d;
-  //bool operator==(my_struct) = default; // c++20
-  bool operator==(my_struct rhs)
-  {
-    return (rhs.a == a)
-      && (rhs.b == b)
-      && (rhs.c == c)
-      && (rhs.d == d);
+  // bool operator==(my_struct) = default; // c++20
+  bool operator==(my_struct rhs) {
+    return (rhs.a == a) && (rhs.b == b) && (rhs.c == c) && (rhs.d == d);
   }
 };
 
-const my_struct ref
-{
-  .a = 3,
-  .b = 1,
-  .c = 4,
-  .d = 2,
+const my_struct ref{
+    .a = 3,
+    .b = 1,
+    .c = 4,
+    .d = 2,
 };
 
-#define check(cond) do { if (!(cond)){ ipc_cleanup(); printf( __FILE__ ":" M_STRINGIFY(__LINE__) " " "Assertion failed: " #cond "\n"); exit(1); }} while(0)
+#define check(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      ipc_cleanup();                                                           \
+      printf(__FILE__ ":" M_STRINGIFY(__LINE__) " "                            \
+                                                "Assertion failed: " #cond     \
+                                                "\n");                         \
+      exit(1);                                                                 \
+    }                                                                          \
+  } while (0)
 
-int main()
-{
+int main() {
   ipc_cleanup();
   {
     {
@@ -63,13 +65,13 @@ int main()
 
   {
     {
-      //ipc_writer<my_struct, strval_t("test/mt_safe")> writer;
+      // ipc_writer<my_struct, strval_t("test/mt_safe")> writer;
       auto writer = create_ipc_writer(my_struct, "test/mt_safe");
       writer.write(ref);
     }
 
     {
-      //ipc_reader<my_struct, strval_t("test/mt_safe")> reader;
+      // ipc_reader<my_struct, strval_t("test/mt_safe")> reader;
       auto reader = create_ipc_reader(my_struct, "test/mt_safe");
       my_struct entry;
       int rc = reader.read(entry);
@@ -122,7 +124,8 @@ int main()
 
   // moving
   {
-    ipc_rtid_reader<my_struct> a = create_ipc_rtid_reader<my_struct>("test/moving");
+    ipc_rtid_reader<my_struct> a =
+        create_ipc_rtid_reader<my_struct>("test/moving");
 
     ipc_rtid_reader<my_struct> b;
     b = std::move(a);

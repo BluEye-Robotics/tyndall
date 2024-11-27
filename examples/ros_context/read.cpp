@@ -1,31 +1,30 @@
-#include <tyndall/ros_context.h>
 #include <cstdio>
+#include <tyndall/ros_context.h>
 #ifdef NO_ROS
-  namespace std_msgs { struct Int32 { int data; }; }
+namespace std_msgs::msg {
+struct Int32 {
+  int data;
+};
+} // namespace std_msgs::msg
 #else
-  #include <std_msgs/Int32.h>
+#include <std_msgs/msg/int32.hpp>
 #endif
+#include <chrono>
 #include <csignal>
 #include <thread>
-#include <chrono>
 
 sig_atomic_t run = 1;
 
-void signal_handler(int sig)
-{
-  run = 0;
-}
+void signal_handler(int sig) { run = 0; }
 
-int main(int argc, char** argv)
-{
-  ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_read");
+int main(int argc, char **argv) {
+  ros_context::init(argc, argv, std::chrono::milliseconds{3},
+                    "ex_ros_context_read");
 
   signal(SIGINT, signal_handler);
 
-  while(run)
-  {
-    std_msgs::Int32 msg{};
-
+  while (run) {
+    std_msgs::msg::Int32 msg{};
 
     int rc = ros_context_read(msg, "/ex_ros_context");
 

@@ -4,15 +4,14 @@
 // http://saadahmad.ca/cc-preprocessor-metaprogramming-basic-pattern-matching-macros-and-conditionals/
 // https://github.com/pfultz2/Cloak/wiki/C-Preprocessor-tricks,-tips,-and-idioms#deferred-expression
 
-
 #define M_MAX_ARITHMETIC 126 // Max number to be used in arithmetic
 
-#define M_EMPTY() 
+#define M_EMPTY()
 #define M_DEFER(...) __VA_ARGS__ M_EMPTY()
-#define M_DEFER2(...) __VA_ARGS__ M_DEFER(M_EMPTY) ()
-#define M_DEFER3(...) __VA_ARGS__ M_DEFER2(M_EMPTY) ()
-#define M_DEFER4(...) __VA_ARGS__ M_DEFER3(M_EMPTY) ()
-#define M_DEFER5(...) __VA_ARGS__ M_DEFER4(M_EMPTY) ()
+#define M_DEFER2(...) __VA_ARGS__ M_DEFER(M_EMPTY)()
+#define M_DEFER3(...) __VA_ARGS__ M_DEFER2(M_EMPTY)()
+#define M_DEFER4(...) __VA_ARGS__ M_DEFER3(M_EMPTY)()
+#define M_DEFER5(...) __VA_ARGS__ M_DEFER4(M_EMPTY)()
 
 #define M_EVAL_1(...) __VA_ARGS__
 #define M_EVAL_2(...) M_EVAL_1(M_EVAL_1(__VA_ARGS__))
@@ -27,16 +26,16 @@
 #define M_EAT(...)
 #define M_EXPAND(...) __VA_ARGS__
 #define M_OBSTRUCT(...) __VA_ARGS__ M_DEFER(M_EMPTY)()
- 
+
 #define M_ENCLOSE_EXPAND(...) EXPANDED, ENCLOSED, (__VA_ARGS__) ) M_EAT (
-#define M_GET_CAT_EXP(a, b) (a, M_ENCLOSE_EXPAND b, DEFAULT, b )
+#define M_GET_CAT_EXP(a, b) (a, M_ENCLOSE_EXPAND b, DEFAULT, b)
 
 #define M_CAT_WITH_ENCLOSED(a, b) a b
-#define M_CAT_WITH_DEFAULT(a, b) a ## b
-#define M_CAT_WITH(a, _, f, b) M_CAT_WITH_ ## f (a, b)
+#define M_CAT_WITH_DEFAULT(a, b) a##b
+#define M_CAT_WITH(a, _, f, b) M_CAT_WITH_##f(a, b)
 
 #define M_EVAL_CAT_WITH(...) M_CAT_WITH __VA_ARGS__
-#define M_CAT(a, b) M_EVAL_CAT_WITH ( M_GET_CAT_EXP(a, b) )
+#define M_CAT(a, b) M_EVAL_CAT_WITH(M_GET_CAT_EXP(a, b))
 
 #define M_HEAD(x, ...) x
 #define M_HEAD1(x, y, ...) y
@@ -45,7 +44,7 @@
 #define M_TAIL(x, ...) __VA_ARGS__
 #define M_TAIL1(x, y, ...) __VA_ARGS__
 #define M_TAIL2(x, y, z, ...) __VA_ARGS__
- 
+
 #define _M_STRINGIFY(x) #x
 #define M_STRINGIFY(x) _M_STRINGIFY(x)
 
@@ -55,33 +54,32 @@
 
 // for range stuff:
 #define M_EXPAND_TEST_EXISTS(...) EXPANDED, EXISTS(__VA_ARGS__) ) M_EAT (
-#define M_GET_TEST_EXISTS_RESULT(x) ( CAT(EXPAND_TEST_, x),  DOESNT_EXIST )
- 
+#define M_GET_TEST_EXISTS_RESULT(x) (CAT(EXPAND_TEST_, x), DOESNT_EXIST)
+
 #define M_GET_TEST_EXIST_VALUE_(expansion, existValue) existValue
-#define M_GET_TEST_EXIST_VALUE(x) M_GET_TEST_EXIST_VALUE_  x 
- 
-#define M_TEST_EXISTS(x) M_GET_TEST_EXIST_VALUE (  M_GET_TEST_EXISTS_RESULT(x) )
+#define M_GET_TEST_EXIST_VALUE(x) M_GET_TEST_EXIST_VALUE_ x
+
+#define M_TEST_EXISTS(x) M_GET_TEST_EXIST_VALUE(M_GET_TEST_EXISTS_RESULT(x))
 
 #define M_DOES_VALUE_EXIST_EXISTS(...) 1
 #define M_DOES_VALUE_EXIST_DOESNT_EXIST 0
 #define M_DOES_VALUE_EXIST(x) M_CAT(M_DOES_VALUE_EXIST_, x)
- 
+
 #define M_EXTRACT_VALUE_EXISTS(...) __VA_ARGS__
 #define M_EXTRACT_VALUE(value) M_CAT(M_EXTRACT_VALUE_, value)
- 
-#define M_TRY_EXTRACT_EXISTS(value, ...) \
-  M_IF ( M_DOES_VALUE_EXIST(M_TEST_EXISTS(value)) )\
-  ( M_EXTRACT_VALUE(value), __VA_ARGS__ )
 
+#define M_TRY_EXTRACT_EXISTS(value, ...)                                       \
+  M_IF(M_DOES_VALUE_EXIST(M_TEST_EXISTS(value)))                               \
+  (M_EXTRACT_VALUE(value), __VA_ARGS__)
 
 #define M_NOT_0 EXISTS(1)
-#define M_NOT(x) M_TRY_EXTRACT_EXISTS ( CAT(NOT_, x), 0 )
+#define M_NOT(x) M_TRY_EXTRACT_EXISTS(CAT(NOT_, x), 0)
 
 #define M_IF_1(true, ...) true
 #define M_IF_0(true, ...) __VA_ARGS__
 #define M_IF(value) M_CAT(M_IF_, value)
 
-#define M_PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
+#define M_PRIMITIVE_CAT(a, ...) a##__VA_ARGS__
 #define M_BITAND(x) M_PRIMITIVE_CAT(M_BITAND_, x)
 #define M_BITAND_0(y) 0
 #define M_BITAND_1(y) y
@@ -91,59 +89,36 @@
 #define M_COMPL_1 0
 
 #define M_CHECK_N(x, n, ...) n
-#define M_CHECK(...) M_CHECK_N(__VA_ARGS__, 0,)
+#define M_CHECK(...) M_CHECK_N(__VA_ARGS__, 0, )
 #define M_PROBE(x) x, 1,
 
 #define M_IS_PAREN(x) M_CHECK(M_IS_PAREN_PROBE x)
 #define M_IS_PAREN_PROBE(...) M_PROBE(~)
 
-#define M_PRIMITIVE_COMPARE(x, y) M_IS_PAREN \
-( \
-M_COMPARE_ ## x ( M_COMPARE_ ## y) (())  \
-)
+#define M_PRIMITIVE_COMPARE(x, y) M_IS_PAREN(M_COMPARE_##x(M_COMPARE_##y)(()))
 
-#define M_IS_COMPARABLE(x) M_IS_PAREN( M_CAT(M_COMPARE_, x) (()) )
+#define M_IS_COMPARABLE(x) M_IS_PAREN(M_CAT(M_COMPARE_, x)(()))
 
-#define M_NOT_EQUAL(x, y) \
-M_IF(M_BITAND(M_IS_COMPARABLE(x))(M_IS_COMPARABLE(y)) ) \
-( \
-  M_PRIMITIVE_COMPARE, \
-  1 M_EAT \
-)(x, y)
+#define M_NOT_EQUAL(x, y)                                                      \
+  M_IF(M_BITAND(M_IS_COMPARABLE(x))(M_IS_COMPARABLE(y)))                       \
+  (M_PRIMITIVE_COMPARE, 1 M_EAT)(x, y)
 
 // M_RANGE example:
-//#define PR(i, _) printf("iteration: %d\n", i);
+// #define PR(i, _) printf("iteration: %d\n", i);
 //_RANGE(PR, 0, 8))
-#define M_RANGE(macro, start, end, ...) \
-  M_IF(M_NOT_EQUAL(start, end)) \
-  ( \
-    M_OBSTRUCT(M_RANGE_INDIRECT) () \
-    ( \
-        macro, start, M_DEC(end), __VA_ARGS__ \
-    ) \
-    M_OBSTRUCT(macro) \
-    ( \
-        M_DEC(end), __VA_ARGS__ \
-    ) \
-  )
+#define M_RANGE(macro, start, end, ...)                                        \
+  M_IF(M_NOT_EQUAL(start, end))                                                \
+  (M_OBSTRUCT(M_RANGE_INDIRECT)()(macro, start, M_DEC(end),                    \
+                                  __VA_ARGS__)M_OBSTRUCT(macro)(M_DEC(end),    \
+                                                                __VA_ARGS__))
 #define M_RANGE_INDIRECT() M_RANGE
 
-#define M_RANGE_WITH_COMMA(macro, start, end, ...) \
-  M_IF(M_NOT_EQUAL(start, end)) \
-  ( \
-    M_OBSTRUCT(M_RANGE_WITH_COMMA_INDIRECT) () \
-    ( \
-        macro, start, M_DEC(end), __VA_ARGS__ \
-    ) \
-    M_IF(M_NOT_EQUAL(start, M_DEC(end))) \
-    ( \
-      M_EXPAND(,) \
-    ) \
-    M_OBSTRUCT(macro) \
-    ( \
-        M_DEC(end), __VA_ARGS__ \
-    ) \
-  )
+#define M_RANGE_WITH_COMMA(macro, start, end, ...)                             \
+  M_IF(M_NOT_EQUAL(start, end))                                                \
+  (M_OBSTRUCT(M_RANGE_WITH_COMMA_INDIRECT)()(                                  \
+      macro, start, M_DEC(end),                                                \
+      __VA_ARGS__)M_IF(M_NOT_EQUAL(start, M_DEC(end)))(M_EXPAND(, ))           \
+       M_OBSTRUCT(macro)(M_DEC(end), __VA_ARGS__))
 #define M_RANGE_WITH_COMMA_INDIRECT() M_RANGE_WITH_COMMA
 
 #define M_COMPARE_0(x) x
@@ -275,7 +250,7 @@ M_IF(M_BITAND(M_IS_COMPARABLE(x))(M_IS_COMPARABLE(y)) ) \
 #define M_COMPARE_126(x) x
 #define M_COMPARE_127(x) x
 
-//#define DEC_0 127
+// #define DEC_0 127
 #define M_DEC_1 0
 #define M_DEC_2 1
 #define M_DEC_3 2

@@ -18,7 +18,8 @@ typedef struct
   } data[50];
 } my_struct;
 
-#define my_struct_print(print, s, ...) print("%d\t%d\t%d" __VA_ARGS__ , s.data[0].ii, s.data[0].iii, s.data[0].iiii)
+#define my_struct_print(print, s, ...) print("%d\t%d\t%d" __VA_ARGS__ ,
+s.data[0].ii, s.data[0].iii, s.data[0].iiii)
 
 #define my_struct_inc(entry)    \
     do{                         \
@@ -31,16 +32,15 @@ typedef struct
     }while(0)
 */
 
-typedef struct
-{
+typedef struct {
   unsigned char i;
   float j;
 } my_struct;
 
-#define my_struct_print(print, s, ...) print("%u %f" __VA_ARGS__ , s.i, s.j)
+#define my_struct_print(print, s, ...) print("%u %f" __VA_ARGS__, s.i, s.j)
 
-#define my_struct_inc(entry)    \
-    do{                         \
-      ++(entry.i);   \
-      ++(entry.j);   \
-    }while(0)
+#define my_struct_inc(entry)                                                   \
+  do {                                                                         \
+    ++(entry.i);                                                               \
+    ++(entry.j);                                                               \
+  } while (0)
