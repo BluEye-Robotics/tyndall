@@ -4,3 +4,4 @@
 /build_imx
 .DS_Store
 .vscode
+build_*

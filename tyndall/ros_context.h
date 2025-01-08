@@ -114,13 +114,27 @@ template <typename Message, typename Id> int lazy_read(Message &msg, Id) {
 }
 
 template <typename Message, typename Id>
+static rclcpp::Publisher<Message>::SharedPtr
+get_publisher(rclcpp::QoS &qos_profile, rclcpp::PublisherOptions &pub_options) {
+  std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
+  if (auto n = nh.lock()) {
+    return n->create_publisher<Message>(Id::c_str(), qos_profile, pub_options);
+  }
+  throw std::runtime_error("ros_context::get_publisher: node is not valid");
+}
+
+template <typename Message, typename Id>
 void lazy_write(const Message &msg, Id) {
   static rclcpp::QoS qos_profile(1);
   qos_profile.transient_local();
   static rclcpp::PublisherOptions pub_options;
-  static auto pub = nh.lock()->create_publisher<Message>(
-      Id::c_str(), qos_profile, pub_options);
-  pub->publish(msg);
+
+  try {
+    static auto pub = get_publisher<Message, Id>(qos_profile, pub_options);
+    pub->publish(msg);
+  } catch (const std::exception &e) {
+    std::cerr << "ros_context::lazy_write: " << e.what() << std::endl;
+  }
 }
 
 } // namespace ros_context
