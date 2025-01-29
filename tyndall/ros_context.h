@@ -31,6 +31,7 @@ init(int argc, char **argv,
     0;                                                                         \
   })
 #else
+#include <rclcpp/client.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include "tyndall/meta/strval.h"
@@ -114,9 +115,11 @@ template <typename Message, typename Id> int lazy_read(Message &msg, Id) {
 }
 
 template <typename Message, typename Id>
-static rclcpp::Publisher<Message>::SharedPtr
-get_publisher(rclcpp::QoS &qos_profile, rclcpp::PublisherOptions &pub_options) {
+static rclcpp::Publisher<Message>::SharedPtr get_publisher() {
   std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
+  static rclcpp::QoS qos_profile(1);
+  qos_profile.transient_local();
+  static rclcpp::PublisherOptions pub_options;
   if (auto n = nh.lock()) {
     return n->create_publisher<Message>(Id::c_str(), qos_profile, pub_options);
   }
@@ -125,16 +128,64 @@ get_publisher(rclcpp::QoS &qos_profile, rclcpp::PublisherOptions &pub_options) {
 
 template <typename Message, typename Id>
 void lazy_write(const Message &msg, Id) {
-  static rclcpp::QoS qos_profile(1);
-  qos_profile.transient_local();
-  static rclcpp::PublisherOptions pub_options;
 
   try {
-    static auto pub = get_publisher<Message, Id>(qos_profile, pub_options);
+    static auto pub = get_publisher<Message, Id>();
     pub->publish(msg);
   } catch (const std::exception &e) {
     std::cerr << "ros_context::lazy_write: " << e.what() << std::endl;
   }
+}
+
+template <typename Service, typename Id>
+static rclcpp::Client<Service>::SharedPtr get_client() {
+  std::lock_guard<typeof(ros_mutex)> guard(ros_mutex);
+  if (auto n = nh.lock()) {
+    std::cout << "ros_context::lazy_call: Starting service client for "
+              << Id::c_str() << std::endl;
+    return n->create_client<Service>(Id::c_str());
+  }
+  throw std::runtime_error("ros_context::get_client: node is not valid");
+}
+
+template <typename Service, typename Id>
+typename rclcpp::Client<Service>::SharedResponse
+lazy_call(typename rclcpp::Client<Service>::SharedRequest &req, const Id &) {
+  try {
+    static auto client = get_client<Service, Id>();
+    std::mutex m;
+    std::condition_variable cv;
+    std::unique_lock lk(m);
+    bool ready = false;
+    typename rclcpp::Client<Service>::SharedResponse response = nullptr;
+
+    auto result = client->async_send_request(
+        req, [&](typename rclcpp::Client<Service>::SharedFuture future) {
+          ready = true;
+          response = future.get();
+          cv.notify_all();
+          if (future.get()) {
+            std::cout << "ros_context::lazy_call: Service call succeeded"
+                      << std::endl;
+          } else {
+            std::cerr << "ros_context::lazy_call: Service call failed"
+                      << std::endl;
+          }
+        });
+
+    cv.wait_for(lk, std::chrono::seconds(5), [&] { return ready; });
+
+    if (!ready) {
+      std::cerr << "ros_context::lazy_call: Service call timed out"
+                << std::endl;
+      return {};
+    }
+
+    return response;
+  } catch (const std::exception &e) {
+    std::cerr << "ros_context::lazy_call: " << e.what() << std::endl;
+  }
+  return {};
 }
 
 } // namespace ros_context
@@ -142,5 +193,8 @@ void lazy_write(const Message &msg, Id) {
 #define ros_context_read(msg, id) ros_context::lazy_read(msg, id##_strval)
 
 #define ros_context_write(msg, id) ros_context::lazy_write(msg, id##_strval)
+
+#define ros_context_call(Service, req, id)                                     \
+  ros_context::lazy_call<Service>(req, id##_strval)
 
 #endif
