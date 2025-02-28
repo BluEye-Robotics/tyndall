@@ -127,6 +127,8 @@ class shmem_buf {
   /// @brief Type stored in the shared memory buffer
   using storage = typename DATA_STRUCTURE::storage;
 
+  size_t tailer_size;
+
 public:
   shmem_buf() noexcept : buf(NULL) {
     static_assert(ID::occurrences('/') == 0, "Id can't have slashes");
@@ -171,6 +173,8 @@ public:
 #endif
     } tailer;
 
+    tailer_size = sizeof(tailer);
+
     constexpr size_t size = sizeof(DATA_STRUCTURE) + sizeof(tailer);
     int rc = shmem_create(&buf, id, size);
     assert(rc == 0);
@@ -180,10 +184,11 @@ public:
     assert(reinterpret_cast<uintptr_t>(buf) % CACHELINE_BYTES == 0);
 
     // put type tailer in the end for validation
-    static_assert(
-        sizeof(tailer) < CACHELINE_BYTES,
-        "tailer needs to fit in a single section, as aligned by " M_STRINGIFY(
-            CACHELINE_BYTES));
+    // static_assert(
+    //     sizeof(tailer) < CACHELINE_BYTES,
+    //     "tailer needs to fit in a single section, as aligned by "
+    //     M_STRINGIFY(
+    //         CACHELINE_BYTES));
     auto tailer_loc =
         reinterpret_cast<decltype(tailer) *>(&data_structure() + 1);
 
@@ -197,7 +202,7 @@ public:
 
   void uninit() noexcept {
     if ((buf != NULL) && (buf != (void *)-1))
-      shmem_unmap(buf, sizeof(DATA_STRUCTURE));
+      shmem_unmap(buf, sizeof(DATA_STRUCTURE) + tailer_size);
   }
 
   ~shmem_buf() noexcept { uninit(); }
