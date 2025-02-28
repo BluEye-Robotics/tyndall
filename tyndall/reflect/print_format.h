@@ -134,8 +134,7 @@ template <typename T> size_t print_format_alignment(const char *ptr) {
 
 template <typename Fmt> size_t print_format(const char *data) {
   const size_t align = print_format_alignment<Fmt>(data);
-  printf((print_format_printf<Fmt>() + print_format_typeid<Fmt>()).c_str(),
-         *(Fmt *)(data + align));
+  printf((print_format_printf<Fmt>()).c_str(), *(Fmt *)(data + align));
   return sizeof(Fmt) + align;
 }
 
