@@ -60,7 +60,10 @@ int main() {
       check(entry == ref);
     }
   }
+
+#ifndef NO_ROS
   rclcpp::shutdown();
+#endif
   spin_thread.join();
 
 #ifdef NO_ROS

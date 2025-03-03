@@ -63,8 +63,9 @@ template <typename STORAGE> struct seq_lock {
   static_assert(std::is_trivially_copy_assignable_v<STORAGE>);
 
   unsigned seq;
+  size_t size;
 
-  char padding[CACHELINE_BYTES - sizeof(seq)];
+  char padding[CACHELINE_BYTES - sizeof(seq) - sizeof(size)];
 
   STORAGE entry;
 
@@ -84,6 +85,7 @@ public:
   void write(const STORAGE &entry, seq_lock_state &) {
     unsigned seq = seq_lock_write_begin(&this->seq);
 
+    this->size = sizeof(entry);
     this->entry = entry;
 
     seq_lock_write_end(&this->seq, seq);
