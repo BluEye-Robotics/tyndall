@@ -7,6 +7,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#define IPC_NO_DEBUG_DATA
+
 enum shmem_error {
   SHMEM_SHM_FAILED = 1,
   SHMEM_TRUNCATE_FAILED,
