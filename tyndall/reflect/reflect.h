@@ -13,7 +13,7 @@
 // https://github.com/apolukhin/pfr_non_boost/blob/91f801bb08cf817c640d9c6d57ddfad5f38de92d/LICENSE_1_0.txt
 
 #ifndef REFLECT_MAX_FIELDS
-#define REFLECT_MAX_FIELDS 100
+#define REFLECT_MAX_FIELDS 30
 #endif
 static_assert(M_INC(REFLECT_MAX_FIELDS) < M_MAX_ARITHMETIC,
               "REFLECT_MAX_FIELDS must be less than M_MAX_ARITHMETIC, "
