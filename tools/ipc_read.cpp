@@ -88,6 +88,8 @@ int main(int argc, char **argv) {
   auto opt = desc.add_options();
   opt("help,h", "Produce help message");
   opt("file", po::value(&file)->required(), "File to read");
+  opt("continuous,c", po::bool_switch()->default_value(false),
+      "Continuous read");
   opt("format", po::value(&format),
       "Format to print. Pass in a string of "
       "characters to print the data in that format. Supported characters are:\n"
@@ -183,7 +185,7 @@ int main(int argc, char **argv) {
   }
 
   unsigned seq = 0;
-  while (1) {
+  do {
     bool new_buf = false;
 
     {
@@ -238,7 +240,7 @@ int main(int argc, char **argv) {
       printf("\n");
       // printf("int: %d\n", *(int*)buf);
     }
-  }
+  } while (vm["continuous"].as<bool>());
 
   {
     int rc = munmap(mapped, ipc_size);
