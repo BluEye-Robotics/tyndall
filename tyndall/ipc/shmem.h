@@ -1,6 +1,7 @@
 #pragma once
 #include <dirent.h>
 #include <fcntl.h>
+#include <iostream>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -121,7 +122,7 @@ template <typename DATA_STRUCTURE, int PERMISSIONS, typename ID = strval_t("")>
   requires shmem_data_structure<DATA_STRUCTURE> && (ID::is_strval())
 class shmem_buf {
   /// @brief Shared memory buffer for IPC
-  void *buf;
+  void *buf = nullptr;
   /// @brief State for the data structure
   typename DATA_STRUCTURE::state state;
   /// @brief Type stored in the shared memory buffer
@@ -130,7 +131,7 @@ class shmem_buf {
   size_t tailer_size;
 
 public:
-  shmem_buf() noexcept : buf(NULL) {
+  shmem_buf() noexcept {
     static_assert(ID::occurrences('/') == 0, "Id can't have slashes");
 
     if constexpr (ID{} != ""_strval)
@@ -141,6 +142,10 @@ public:
     static_assert(ID::length() == 0,
                   "Static id should be empty when specifying runtime id");
 
+    // Check that the runtime id is valid
+    assert(id != nullptr);
+    assert(strlen(id) > 0);
+    assert(strchr(id, '/') == nullptr);
     init(id);
   }
 
@@ -201,7 +206,7 @@ public:
   }
 
   void uninit() noexcept {
-    if ((buf != NULL) && (buf != (void *)-1))
+    if ((buf != nullptr) && (buf != (void *)-1))
       shmem_unmap(buf, sizeof(DATA_STRUCTURE) + tailer_size);
   }
 
@@ -236,17 +241,33 @@ public:
 
   // enable move
   shmem_buf &operator=(shmem_buf &&other) noexcept {
+    // Prevent self-assignment
+    if (this == &other) {
+      return *this;
+    }
+
+    // If the current shmem_buf is not empty, unmap it
     uninit();
 
+    // Move the data from the other shmem_buf
     buf = other.buf;
     state = other.state;
-    other.buf = NULL;
+    tailer_size = other.tailer_size;
+
+    // Invalidate the other shmem_buf
+    other.buf = nullptr;
+    other.tailer_size = 0;
+    other.state = typename DATA_STRUCTURE::state();
 
     return *this;
   }
 
-  shmem_buf(shmem_buf &&other) : buf(other.buf), state(other.state) {
-    other.buf = NULL; // invalidate shared memory
+  shmem_buf(shmem_buf &&other)
+      : buf(other.buf), state(other.state), tailer_size(other.tailer_size) {
+    // Invalidate the other shmem_buf
+    other.buf = nullptr;
+    other.tailer_size = 0;
+    other.state = typename DATA_STRUCTURE::state();
   }
 };
 
