@@ -1,12 +1,19 @@
 #pragma once
-#include <dirent.h>
-#include <fcntl.h>
+
+#include <cerrno>
+#include <cstring>
 #include <iostream>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
+#include <string>
+
+#include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
+
+#ifdef __APPLE__
+#include "shmem_mac_ipc_names.h"
+#endif
 
 enum shmem_error {
   SHMEM_SHM_FAILED = 1,
@@ -14,20 +21,91 @@ enum shmem_error {
   SHMEM_MAP_FAILED,
 };
 
+#ifdef __APPLE__
+// macOS requires shm_open names to start with '/'
+inline std::string fix_shm_name(const char *id) {
+  if (!id || id[0] == '\0') {
+    return {};
+  }
+  std::string name(id);
+  if (name[0] != '/') {
+    name = "/" + name;
+  }
+  // macOS limit: name length <= 31 bytes
+  if (name.length() > 31) {
+    name = name.substr(0, 31);
+  }
+  return name;
+}
+#else
+inline std::string fix_shm_name(const char *id) {
+  // Linux does not require starting slash, but having it is fine.
+  if (!id || id[0] == '\0') {
+    return {};
+  }
+  return std::string(id);
+}
+#endif
+
 static inline int shmem_create(void **addr, const char *id, size_t size) {
-  // memfd_create
-  int fd = shm_open(id, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (fd == -1)
+  if (!id || strlen(id) == 0) {
+    std::cerr << "shmem_create error: id is null or empty\n";
     return SHMEM_SHM_FAILED;
+  }
 
-  int rc = ftruncate(fd, static_cast<long>(size));
-  if (rc != 0)
-    return SHMEM_TRUNCATE_FAILED;
+  std::string name = fix_shm_name(id);
+  if (name.empty()) {
+    std::cerr << "shmem_create error: fixed shm name is empty\n";
+    return SHMEM_SHM_FAILED;
+  }
 
-  *addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-  if (*addr == MAP_FAILED)
+  bool created = false;
+  int fd = shm_open(name.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+  if (fd == -1 && errno == EEXIST) {
+    // Already exists, open without O_EXCL
+    fd = shm_open(name.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+    if (fd == -1) {
+      perror("shm_open");
+      return SHMEM_SHM_FAILED;
+    }
+  } else if (fd != -1) {
+    created = true;
+  } else {
+    perror("shm_open");
+    return SHMEM_SHM_FAILED;
+  }
+  
+  // Round size up to page size for mmap compatibility
+  size_t pagesize = static_cast<size_t>(getpagesize());
+  size_t rounded_size = ((size + pagesize - 1) / pagesize) * pagesize;
+  
+  if (created) {
+    #ifdef __APPLE__
+    append_ipc_name(name);
+    #endif
+
+    int rc = ftruncate(fd, static_cast<off_t>(rounded_size));
+    if (rc != 0) {
+      std::cerr << "shmem_create: ftruncate failed for fd "<< fd << " name " << name
+                << ", size = " << rounded_size << "\n";
+      std::cerr << "ftruncate failed with errno = " << errno << ": " << strerror(errno) << "\n";
+
+      perror("ftruncate");
+      close(fd);
+      return SHMEM_TRUNCATE_FAILED;
+    }
+  }
+
+  void *map = mmap(NULL, rounded_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (map == MAP_FAILED) {
+    perror("mmap");
+    close(fd);
     return SHMEM_MAP_FAILED;
+  }
 
+  close(fd);
+
+  *addr = map;
   return 0;
 }
 
@@ -36,32 +114,34 @@ static inline int shmem_unmap(void *addr, size_t size) {
 }
 
 static inline int shmem_unlink(const char *id) {
-  // shm_open cleanup
-  return shm_unlink(id);
+  if (!id || strlen(id) == 0) {
+    return -1;
+  }
+  std::string name = fix_shm_name(id);
+  if (name.empty()) {
+    return -1;
+  }
+  return shm_unlink(name.c_str());
 }
 
 static inline int shmem_unlink_all(const char *prefix) {
-  DIR *dir;
-  struct dirent *ent;
-  dir = opendir("/dev/shm");
-  if (dir == NULL)
-    return -1;
-
-  while ((ent = readdir(dir)) != NULL) {
-    const char *dir_name = ent->d_name;
-    int match = 1;
-
-    for (int i = 0; i < (int)strlen(prefix); ++i)
-      if (dir_name[i] != prefix[i])
-        match = 0;
-
-    if (match)
-      shmem_unlink(dir_name);
-  }
-
-  closedir(dir);
-
-  return 0;
+  #ifdef __APPLE__
+    return unlink_all_ipc_names();
+  #else
+    DIR *dir = opendir("/dev/shm");
+    if (dir == nullptr) {
+      return -1;
+    }
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != nullptr) {
+      const char *dir_name = ent->d_name;
+      if (strncmp(dir_name, prefix, strlen(prefix)) == 0) {
+        shmem_unlink(dir_name);
+      }
+    }
+    closedir(dir);
+    return 0;
+  #endif
 }
 
 #ifdef __cplusplus
@@ -133,9 +213,10 @@ class shmem_buf {
 public:
   shmem_buf() noexcept {
     static_assert(ID::occurrences('/') == 0, "Id can't have slashes");
-
     if constexpr (ID{} != ""_strval)
-      init(ID::c_str());
+      {
+        init(ID{}.c_str());
+      }
   }
 
   shmem_buf(const char *id) noexcept {
@@ -271,4 +352,4 @@ public:
   }
 };
 
-#endif
+#endif // __cplusplus

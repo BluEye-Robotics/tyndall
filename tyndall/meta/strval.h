@@ -9,13 +9,15 @@
 template <char... Chars> struct strval {};
 
 template <char Lhs, char... Rhs> struct strval<Lhs, Rhs...> {
+  char data[1 + sizeof...(Rhs) + 1] = {Lhs, Rhs..., '\0'}; // storage + null terminator
+
   template <char... Args>
   constexpr auto operator+(strval<Args...> rhs) const noexcept {
     return strval<Lhs, Rhs..., Args...>();
   }
 
-  static constexpr const char *c_str() noexcept {
-    return (const char[]){Lhs, Rhs..., '\0'};
+  constexpr const char* c_str() const noexcept {
+    return data;
   }
 
   static constexpr int length() noexcept { return 1 + sizeof...(Rhs); }
@@ -56,20 +58,20 @@ template <char Lhs, char... Rhs> struct strval<Lhs, Rhs...> {
       data[i] = tmp[i];
   }
 
-  char data[length()] = {Lhs, Rhs...}; // actual storage
-
   constexpr static inline bool is_strval() { return true; }
 };
 
 template <> struct strval<> {
-  char data[0]; // enforce zero size
+  char data[1] = {'\0'}; // empty string with null terminator
 
   template <char... Args>
   constexpr auto operator+(strval<Args...> args) const noexcept {
     return strval<Args...>();
   }
 
-  static constexpr const char *c_str() noexcept { return (const char[]){'\0'}; }
+  constexpr const char* c_str() const noexcept {
+    return data;
+  }
 
   static constexpr int length() noexcept { return 0; }
 
