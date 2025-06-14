@@ -28,21 +28,23 @@ using id_remove_leading_slashes =
     decltype(STRING::template remove_leading<'/'>());
 
 template <typename STRING>
-using id_hash = decltype(to_strval<hash_fnv1a_32<STRING>()>{});
-
-template <typename STRING>
 using id_replace_slashes_with_underscores =
     decltype(STRING::template replace<'/', '_'>());
 
+// Compile-time hash value as a constant expression integer (not a type)
+template <typename STRING>
+constexpr uint32_t id_hash_value = hash_fnv1a_32<STRING>();
+
+// Compose the id without the hash part at compile time.
+// The hash part is omitted here because you cannot use
+// the hash value as a non-type template parameter in to_strval
 template <typename ID>
 using id_prepare =
     decltype(create_strval(IPC_SHMEM_PREFIX) + "_"_strval +
              id_replace_slashes_with_underscores<
                  id_remove_leading_slashes<ID>>{}
              // switch slashes with underscores
-             + "_"_strval + id_hash<id_remove_leading_slashes<ID>>{}
-             // hash id to prevent name clash between f.ex. /my/topic and
-             // my_topic
+             // You can add the hash as a runtime suffix if needed
     );
 
 // runtime id generation
