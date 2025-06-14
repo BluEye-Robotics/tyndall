@@ -42,6 +42,10 @@ int main() {
     {
       my_struct entry = {};
       int rc = ipc_read(entry, "/test/standard");
+      if (rc != 0) {
+          perror("ipc_read failed");
+          std::cerr << "ipc_read returned error code: " << rc << std::endl;
+      }
       check(rc == 0);
       check(entry == ref);
     }
