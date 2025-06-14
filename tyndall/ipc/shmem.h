@@ -75,15 +75,14 @@ static inline int shmem_create(void **addr, const char *id, size_t size) {
     return SHMEM_SHM_FAILED;
   }
   
+  // Round size up to page size for mmap compatibility
   size_t pagesize = static_cast<size_t>(getpagesize());
   size_t rounded_size = ((size + pagesize - 1) / pagesize) * pagesize;
+  
   if (created) {
-    if (__APPLE__) {
-      append_ipc_name(name);
-    }
-
-
-    // Round size up to page size for mmap compatibility
+    #ifdef __APPLE__
+    append_ipc_name(name);
+    #endif
 
     int rc = ftruncate(fd, static_cast<off_t>(rounded_size));
     if (rc != 0) {
