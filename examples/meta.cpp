@@ -19,7 +19,7 @@ int main() {
   printf("replace: %s\n", ("hei din sei"_strval).replace<'i', 'y'>().c_str());
   printf("remove_leading: %s\n",
          ("///hei din sei"_strval).remove_leading<'/'>().c_str());
-  printf("to_strval: %s\n", to_strval<42>::c_str());
+  printf("to_strval: %s\n", to_strval<42>{}.c_str());
 
   {
     printf("typevals:\n");

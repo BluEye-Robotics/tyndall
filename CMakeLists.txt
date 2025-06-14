@@ -16,6 +16,10 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${C_CXX_EXTRA_FLAGS}")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wno-gnu-string-literal-operator-template)
+endif()
+
 add_definitions(-DDEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR})
