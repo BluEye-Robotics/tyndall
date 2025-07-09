@@ -39,6 +39,19 @@ public:
     zmq_proto_assert(rc == 0);
   }
 
+  // Implement move constructor
+  context_t(context_t &&other) noexcept : context(other.context) {
+    other.context = NULL; // Set the moved-from context to NULL
+  }
+
+  context_t &operator=(context_t &&other) noexcept {
+    if (this != &other && other.context != NULL) {
+      context = other.context;
+      other.context = NULL; // Set the moved-from context to NULL
+    }
+    return *this;
+  }
+
   int init(int n_threads) {
     context = zmq_ctx_new();
     zmq_proto_assert(context != NULL);
@@ -56,6 +69,12 @@ public:
   void *zmq_handle() { return context; }
 
   ~context_t() {
+    // Avoid double close
+    if (context == NULL) {
+      return;
+    }
+    printf("[ %s:%d %s ] Closing context %p\n", __FILE__, __LINE__, __func__,
+           context);
     int rc;
     do {
       rc = zmq_ctx_destroy(context);
@@ -119,11 +138,29 @@ public:
     }
   }
 
+  // Implement move constructor and assignment operator
+  socket_t(socket_t &&other) noexcept : socket(other.socket) {
+    other.socket = NULL; // Set the moved-from socket to NULL
+  }
+  socket_t &operator=(socket_t &&other) noexcept {
+    if (this != &other && other.socket != NULL) {
+      socket = other.socket;
+      other.socket = NULL; // Set the moved-from socket to NULL
+    }
+    return *this;
+  }
+
   void *zmq_handle() const { return socket; }
 
   void *zmq_handle() { return socket; }
 
   ~socket_t() {
+    // Avoid double close
+    if (socket == NULL) {
+      return;
+    }
+    printf("[ %s:%d %s ] Closing socket %p\n", __FILE__, __LINE__, __func__,
+           socket);
     int rc = zmq_close(socket);
     zmq_proto_assert(rc == 0);
 
@@ -152,6 +189,12 @@ public:
     int rc = zmq_msg_close(&msg);
     zmq_proto_assert(rc == 0);
   }
+
+  // Disallow copy constructor, assignment operator and move operations
+  msg_t(const msg_t &) = delete;
+  msg_t &operator=(const msg_t &) = delete;
+  msg_t(msg_t &&) = delete;
+  msg_t &operator=(msg_t &&) = delete;
 };
 
 // helpers:
@@ -324,10 +367,10 @@ int recv_more(::google::protobuf::MessageLite &proto_msg,
 
 /*
   receives two parts of a multipart message. Matches first with type name and
-  parses second into proto errno: EAGAIN if the inbound message queue was empty
-  errno: EBADMSG if the type name didn't match
-  errno: EOPNOTSUPP if there were no more message parts to receive after first
-  part errno: EPROTO if the proto could not be parsed / did not match
+  parses second into proto errno: EAGAIN if the inbound message queue was
+  empty errno: EBADMSG if the type name didn't match errno: EOPNOTSUPP if
+  there were no more message parts to receive after first part errno: EPROTO
+  if the proto could not be parsed / did not match
 */
 template <socket_type_t socket_type>
 int recv(::google::protobuf::MessageLite &proto_msg,
