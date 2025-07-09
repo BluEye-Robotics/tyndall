@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <google/protobuf/wrappers.pb.h>
-#include <iostream>
 #include <thread>
 #include <tyndall/meta/macro.h>
 #include <tyndall/proto/zmq_proto.h>
