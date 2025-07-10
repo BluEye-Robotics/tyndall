@@ -1,0 +1,24 @@
+name: compile_macos
+
+on: [push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Install Packages
+        run: |
+          brew install boost fmt jq zeromq googletest
+
+      # tyndall
+      - uses: actions/checkout@v2
+        with:
+          path: tyndall
+          lfs: true
+      - name: Build
+        run: cd $GITHUB_WORKSPACE/tyndall && mkdir build && cd build && cmake .. && make all
