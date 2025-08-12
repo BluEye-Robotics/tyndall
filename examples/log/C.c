@@ -1,8 +1,7 @@
 #define LOG_PRINTF
 // #define LOG_FMT
-#include <tyndall/log/log.h>
-
 #include <signal.h>
+#include <tyndall/log/log.h>
 #include <unistd.h>
 
 sig_atomic_t run = 1;
