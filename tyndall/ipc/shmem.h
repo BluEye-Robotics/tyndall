@@ -189,11 +189,10 @@ public:
     assert(reinterpret_cast<uintptr_t>(buf) % CACHELINE_BYTES == 0);
 
     // put type tailer in the end for validation
-    // static_assert(
-    //     sizeof(tailer) < CACHELINE_BYTES,
-    //     "tailer needs to fit in a single section, as aligned by "
-    //     M_STRINGIFY(
-    //         CACHELINE_BYTES));
+    static_assert(
+        sizeof(tailer) < CACHELINE_BYTES,
+        "tailer needs to fit in a single section, as aligned by " M_STRINGIFY(
+            CACHELINE_BYTES));
     auto tailer_loc =
         reinterpret_cast<decltype(tailer) *>(&data_structure() + 1);
 
