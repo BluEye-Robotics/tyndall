@@ -19,6 +19,7 @@
 #include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <cstddef>
 #include <tyndall/ipc/seq_lock.h>
 #include <tyndall/reflect/print_format.h>
 #include <unistd.h>
@@ -162,15 +163,82 @@ int main(int argc, char **argv) {
   // shared memory should be page aligned:
   assert(reinterpret_cast<uintptr_t>(mapped) % CACHELINE_BYTES == 0);
 
+  // The shared memory layout is defined by seq_lock<STORAGE>. The offsets of
+  // seq and size are fixed on a given platform (and computed with offsetof
+  // below), but the offset of entry depends on STORAGE's alignment: the
+  // compiler places entry right after padding[], rounded up to
+  // alignof(STORAGE). We don't know STORAGE here, but we can derive an upper
+  // bound on its alignment from the largest type in the format string.
+  using probe_lock = seq_lock<char>;
+
+  auto format_char_align = [](char c) -> size_t {
+    switch (c) {
+    case 'd': // double
+    case 'l': // long
+    case 'm': // unsigned long
+    case 'x': // long long
+    case 'y': // unsigned long long
+      return 8;
+    case 'f': // float
+    case 'i': // int
+    case 'j': // unsigned int
+      return 4;
+    case 's': // short
+    case 't': // unsigned short
+      return 2;
+    default: // b(bool), c(char), h(unsigned char)
+      return 1;
+    }
+  };
+
   // Seq lock number address
-  unsigned *ipc_seq = (unsigned *)mapped;
+  unsigned *ipc_seq =
+      (unsigned *)((char *)mapped + offsetof(probe_lock, seq));
 
   // Data size address
-  size_t *data_size = (size_t *)(mapped + sizeof(unsigned));
-  // Data address
-  const char *const ipc_buf = (const char *)mapped + CACHELINE_BYTES;
+  size_t *data_size =
+      (size_t *)((char *)mapped + offsetof(probe_lock, size));
 
-  const size_t buf_size = ipc_size - 2 * sizeof(int) - CACHELINE_BYTES;
+  // Determine the format string up-front so we can compute the correct entry
+  // offset. If --format wasn't given, peek at the debug tailer at the end of
+  // the shmem region to recover it.
+  std::string fmt_string;
+  const std::vector<char> allowed = {'b', 'f', 'd', 'i', 'j', 's', 't',
+                                     'c', 'h', 'l', 'm', 'x', 'y'};
+  if (format.has_value()) {
+    fmt_string = format.get();
+  } else {
+    constexpr int type_info_hash_size = 4;
+    const size_t debug_tail_size = ipc_size - *data_size;
+    if (debug_tail_size > (size_t)type_info_hash_size) {
+      const size_t debug_format_size = debug_tail_size - type_info_hash_size;
+      char *const debug_format_loc = static_cast<char *>(mapped) + ipc_size -
+                                     debug_format_size + CACHELINE_BYTES + 24;
+      std::string candidate(debug_format_loc);
+      auto valid = !candidate.empty() &&
+                   std::all_of(candidate.begin(), candidate.end(), [&](char c) {
+                     return std::find(allowed.begin(), allowed.end(), c) !=
+                            allowed.end();
+                   });
+      if (valid)
+        fmt_string = candidate;
+    }
+  }
+
+  // Round entry offset up to STORAGE's alignment (upper-bounded by the
+  // strictest format char). If we have no format hint, fall back to 1-byte
+  // alignment, which only matches byte-aligned STORAGE types.
+  size_t storage_align = 1;
+  for (char c : fmt_string)
+    storage_align = std::max(storage_align, format_char_align(c));
+
+  const size_t entry_offset =
+      (offsetof(probe_lock, entry) + storage_align - 1) & ~(storage_align - 1);
+
+  // Data address
+  const char *const ipc_buf = (const char *)mapped + entry_offset;
+
+  const size_t buf_size = ipc_size - entry_offset;
 
   std::vector<char> buffer(buf_size + CACHELINE_BYTES, 0);
 
@@ -212,33 +280,13 @@ int main(int argc, char **argv) {
       continue;
     }
 
-    // extract debug format
-    constexpr int type_info_hash_size = 4;
-    const size_t debug_tail_size = ipc_size - *data_size;
-    const size_t debug_format_size = debug_tail_size - type_info_hash_size;
-
-    char *const debug_format_loc = static_cast<char *>(mapped) + ipc_size -
-                                   debug_format_size + CACHELINE_BYTES + 24;
-
-    char *fmt = debug_format_loc;
-    std::string fmt_string(fmt);
-
-    std::vector<char> allowed = {'b', 'f', 'd', 'i', 'j', 's', 't',
-                                 'c', 'h', 'l', 'm', 'x', 'y'};
-
-    auto valid = std::all_of(fmt_string.begin(), fmt_string.end(), [&](char c) {
-      return std::find(allowed.begin(), allowed.end(), c) != allowed.end();
-    });
-
-    if (debug_tail_size > type_info_hash_size && fmt_string.size() > 0 &&
-        valid) {
-      print(fmt, buf, buf_size);
+    if (!fmt_string.empty()) {
+      print(fmt_string.data(), buf, buf_size);
     } else {
       auto len = *data_size;
       for (size_t i = 0; i < len; ++i)
         printf("%02x", buf[i]);
       printf("\n");
-      // printf("int: %d\n", *(int*)buf);
     }
   } while (vm["continuous"].as<bool>());
 
