@@ -19,6 +19,7 @@
 #include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <cstddef>
 #include <tyndall/ipc/seq_lock.h>
 #include <tyndall/reflect/print_format.h>
 #include <unistd.h>
@@ -162,15 +163,24 @@ int main(int argc, char **argv) {
   // shared memory should be page aligned:
   assert(reinterpret_cast<uintptr_t>(mapped) % CACHELINE_BYTES == 0);
 
+  // The shared memory layout is defined by seq_lock<STORAGE>. The offsets of
+  // seq, size, and entry depend on the platform's alignment rules (e.g. on
+  // 64-bit targets size_t introduces padding between seq and size), so compute
+  // them with offsetof instead of assuming the entry starts at CACHELINE_BYTES.
+  using probe_lock = seq_lock<char>;
+
   // Seq lock number address
-  unsigned *ipc_seq = (unsigned *)mapped;
+  unsigned *ipc_seq =
+      (unsigned *)((char *)mapped + offsetof(probe_lock, seq));
 
   // Data size address
-  size_t *data_size = (size_t *)(mapped + sizeof(unsigned));
+  size_t *data_size =
+      (size_t *)((char *)mapped + offsetof(probe_lock, size));
   // Data address
-  const char *const ipc_buf = (const char *)mapped + CACHELINE_BYTES;
+  const char *const ipc_buf =
+      (const char *)mapped + offsetof(probe_lock, entry);
 
-  const size_t buf_size = ipc_size - 2 * sizeof(int) - CACHELINE_BYTES;
+  const size_t buf_size = ipc_size - offsetof(probe_lock, entry);
 
   std::vector<char> buffer(buf_size + CACHELINE_BYTES, 0);
 
