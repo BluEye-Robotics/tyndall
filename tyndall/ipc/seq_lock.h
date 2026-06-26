@@ -65,9 +65,14 @@ template <typename STORAGE> struct seq_lock {
   unsigned seq;
   size_t size;
 
-  char padding[CACHELINE_BYTES - sizeof(seq) - sizeof(size)];
-
-  STORAGE entry;
+  // Force entry onto its own cacheline so the sequence counter and payload do
+  // not false-share. alignas places entry at offsetof == CACHELINE_BYTES on
+  // every ABI, regardless of the alignment padding the compiler inserts between
+  // seq and size (4 bytes on 64-bit targets). See issue #16.
+  static_assert(alignof(STORAGE) <= CACHELINE_BYTES,
+                "STORAGE alignment exceeds cacheline; entry cannot be "
+                "cacheline-isolated");
+  alignas(CACHELINE_BYTES) STORAGE entry;
 
 public:
   using storage = STORAGE;

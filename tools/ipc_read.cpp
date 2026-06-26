@@ -163,33 +163,12 @@ int main(int argc, char **argv) {
   // shared memory should be page aligned:
   assert(reinterpret_cast<uintptr_t>(mapped) % CACHELINE_BYTES == 0);
 
-  // The shared memory layout is defined by seq_lock<STORAGE>. The offsets of
-  // seq and size are fixed on a given platform (and computed with offsetof
-  // below), but the offset of entry depends on STORAGE's alignment: the
-  // compiler places entry right after padding[], rounded up to
-  // alignof(STORAGE). We don't know STORAGE here, but we can derive an upper
-  // bound on its alignment from the largest type in the format string.
+  // The shared memory layout is defined by seq_lock<STORAGE>. seq_lock aligns
+  // entry to CACHELINE_BYTES (see issue #16), so entry sits exactly one
+  // cacheline in regardless of STORAGE's alignment. That makes offsetof(entry)
+  // independent of STORAGE, so seq_lock<char> is a faithful probe for all three
+  // offsets.
   using probe_lock = seq_lock<char>;
-
-  auto format_char_align = [](char c) -> size_t {
-    switch (c) {
-    case 'd': // double
-    case 'l': // long
-    case 'm': // unsigned long
-    case 'x': // long long
-    case 'y': // unsigned long long
-      return 8;
-    case 'f': // float
-    case 'i': // int
-    case 'j': // unsigned int
-      return 4;
-    case 's': // short
-    case 't': // unsigned short
-      return 2;
-    default: // b(bool), c(char), h(unsigned char)
-      return 1;
-    }
-  };
 
   // Seq lock number address
   unsigned *ipc_seq =
@@ -199,9 +178,9 @@ int main(int argc, char **argv) {
   size_t *data_size =
       (size_t *)((char *)mapped + offsetof(probe_lock, size));
 
-  // Determine the format string up-front so we can compute the correct entry
-  // offset. If --format wasn't given, peek at the debug tailer at the end of
-  // the shmem region to recover it.
+  // Determine the format string used to decode/print the payload. If --format
+  // wasn't given, peek at the debug tailer at the end of the shmem region to
+  // recover it.
   std::string fmt_string;
   const std::vector<char> allowed = {'b', 'f', 'd', 'i', 'j', 's', 't',
                                      'c', 'h', 'l', 'm', 'x', 'y'};
@@ -225,15 +204,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Round entry offset up to STORAGE's alignment (upper-bounded by the
-  // strictest format char). If we have no format hint, fall back to 1-byte
-  // alignment, which only matches byte-aligned STORAGE types.
-  size_t storage_align = 1;
-  for (char c : fmt_string)
-    storage_align = std::max(storage_align, format_char_align(c));
-
-  const size_t entry_offset =
-      (offsetof(probe_lock, entry) + storage_align - 1) & ~(storage_align - 1);
+  // entry is cacheline-aligned by seq_lock, so its offset is fixed regardless
+  // of STORAGE.
+  const size_t entry_offset = offsetof(probe_lock, entry);
 
   // Data address
   const char *const ipc_buf = (const char *)mapped + entry_offset;
