@@ -11,6 +11,7 @@
 // compile.
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <tyndall/ipc/seq_lock.h>
