@@ -15,7 +15,7 @@
 #if __arm__ || __aarch64__
 
 #ifdef __aarch64__
-// Cortex-A (e.g. Orin/Cortex-A78AE) use 64-byte cache lines. Verified on target
+// Cortex-A (e.g. Orin/Cortex-A78AE) uses 64-byte cache lines. Verified on target
 // via /sys/devices/system/cpu/cpu0/cache/index*/coherency_line_size.
 #define CACHELINE_BYTES 64
 #else
