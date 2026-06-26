@@ -53,8 +53,10 @@ template void check_layout<s_mixed>();
 
 template <typename STORAGE> void check_runtime(const char *name) {
   seq_lock<STORAGE> s{};
-  const size_t off =
-      reinterpret_cast<char *>(&s.entry) - reinterpret_cast<char *>(&s);
+  // Use integer address arithmetic: subtracting char* derived from distinct
+  // subobjects is not well-defined.
+  const size_t off = reinterpret_cast<uintptr_t>(&s.entry) -
+                     reinterpret_cast<uintptr_t>(&s);
   printf("seq_lock<%s>: offsetof(entry)=%zu CACHELINE_BYTES=%d sizeof=%zu\n",
          name, off, (int)CACHELINE_BYTES, sizeof(seq_lock<STORAGE>));
   check(off == CACHELINE_BYTES);
