@@ -37,7 +37,8 @@ target_link_libraries(tyndall ${LD_FLAGS})
 install(TARGETS tyndall DESTINATION lib)
 
 if("${rclcpp_FOUND}")
-  ament_target_dependencies(tyndall rclcpp builtin_interfaces std_msgs std_srvs)
+  # ROS 2 Lyrical dropped ament_target_dependencies(); link the exported targets.
+  target_link_libraries(tyndall ${rclcpp_TARGETS} ${builtin_interfaces_TARGETS} ${std_msgs_TARGETS} ${std_srvs_TARGETS})
 endif()
 
 file(GLOB HEADERS "tyndall/*.h*" "tyndall/*/*.h*")
