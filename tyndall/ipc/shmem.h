@@ -21,10 +21,15 @@ static inline int shmem_create(void **addr, const char *id, size_t size) {
     return SHMEM_SHM_FAILED;
 
   int rc = ftruncate(fd, static_cast<long>(size));
-  if (rc != 0)
+  if (rc != 0) {
+    close(fd);
     return SHMEM_TRUNCATE_FAILED;
+  }
 
   *addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  // The mapping keeps the shared memory object alive; the descriptor is not
+  // needed any more.
+  close(fd);
   if (*addr == MAP_FAILED)
     return SHMEM_MAP_FAILED;
 
