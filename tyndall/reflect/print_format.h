@@ -116,7 +116,7 @@ template <> constexpr auto print_format_printf<long>() noexcept {
 }
 
 template <> constexpr auto print_format_printf<unsigned long>() noexcept {
-  return "%u"_strval;
+  return "%lu"_strval;
 }
 
 template <> constexpr auto print_format_printf<long long>() noexcept {

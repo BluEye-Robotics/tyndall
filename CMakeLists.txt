@@ -5,22 +5,45 @@ project(tyndall)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(C_CXX_EXTRA_FLAGS "-O2 -Wall -Wconversion -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -fconcepts-diagnostics-depth=4")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(C_CXX_EXTRA_FLAGS "-O2 -Wall -Wconversion -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -fconcepts-diagnostics-depth=4")
+else()
+  set(C_CXX_EXTRA_FLAGS "-O2 -Wall -Wconversion -Wextra -Wno-unused-parameter -Wno-missing-field-initializers")
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${C_CXX_EXTRA_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${C_CXX_EXTRA_FLAGS}")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wno-gnu-string-literal-operator-template)
+endif()
 
 add_definitions(-DDEBUG)
 
 include_directories(${CMAKE_SOURCE_DIR})
 set(LD_FLAGS "-lpthread -lzmq -lprotobuf -lfmt -lrt -latomic")
 
+if(APPLE)
+  # macOS has no librt or libatomic, and nothing in tyndall uses ZeroMQ or
+  # Protobuf any more. fmt is linked as a target below, so that its Homebrew
+  # include and library paths come with it. LD_FLAGS also goes into
+  # tyndall.pc, so it stays as it is on Linux.
+  set(LD_FLAGS "-lpthread")
+endif()
+
 find_package(Boost COMPONENTS program_options filesystem REQUIRED)
+if(APPLE)
+  find_package(fmt REQUIRED)
+endif()
 
 file(GLOB CFILES "tyndall/*.c*" "tyndall/*/*.c*")
 add_library(tyndall SHARED ${CFILES})
 target_link_libraries(tyndall ${LD_FLAGS})
+if(APPLE)
+  target_link_libraries(tyndall fmt::fmt)
+endif()
 install(TARGETS tyndall DESTINATION lib)
 
 file(GLOB HEADERS "tyndall/*.h*" "tyndall/*/*.h*")

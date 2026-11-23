@@ -14,9 +14,12 @@ template <char Lhs, char... Rhs> struct strval<Lhs, Rhs...> {
     return strval<Lhs, Rhs..., Args...>();
   }
 
-  static constexpr const char *c_str() noexcept {
-    return (const char[]){Lhs, Rhs..., '\0'};
-  }
+  // A static array, not a compound literal: clang makes a compound literal a
+  // temporary, so the returned pointer dangles and hashing an id at compile
+  // time is not a constant expression.
+  static constexpr char c_str_storage[] = {Lhs, Rhs..., '\0'};
+
+  static constexpr const char *c_str() noexcept { return c_str_storage; }
 
   static constexpr int length() noexcept { return 1 + sizeof...(Rhs); }
 
@@ -69,7 +72,7 @@ template <> struct strval<> {
     return strval<Args...>();
   }
 
-  static constexpr const char *c_str() noexcept { return (const char[]){'\0'}; }
+  static constexpr const char *c_str() noexcept { return ""; }
 
   static constexpr int length() noexcept { return 0; }
 

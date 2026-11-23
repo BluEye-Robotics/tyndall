@@ -27,4 +27,24 @@ int main() {
     *hei_p = {};
     assert(strcmp(buf, hei.c_str()) == 0);
   }
+
+  {
+    assert("abcdef"_strval.length() == 6);
+    assert("abcdef"_strval.occurrences('a') == 1);
+    assert("abcdef"_strval.occurrences('b') == 1);
+    assert("abcdef"_strval.occurrences('c') == 1);
+    assert("abcdef"_strval.occurrences('d') == 1);
+    assert("abcdef"_strval.occurrences('e') == 1);
+    assert("abcdef"_strval.occurrences('f') == 1);
+    assert("abcdef"_strval.occurrences('g') == 0);
+  }
+
+  {
+    assert("/test/standard"_strval.length() == 14);
+    assert("/test/standard"_strval.occurrences('/') == 2);
+    assert("/test/standard"_strval.occurrences('t') == 3);
+    assert("/test/standard"_strval.occurrences('e') == 1);
+    assert("/test/standard"_strval.occurrences('s') == 2);
+    assert("/test/standard"_strval.occurrences('a') == 2);
+  }
 }
