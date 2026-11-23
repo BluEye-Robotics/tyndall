@@ -16,8 +16,6 @@ gcc / c++20, cmake
 
 [Boost.Python](https://github.com/boostorg/python)
 
-[ROS (optional)](http://wiki.ros.org/ROS/Tutorials)
-
 ### Build
 ```
 mkdir build
@@ -56,88 +54,6 @@ printf("%s\n", s.c_str());
 printf("%s\n", decltype(sv)::c_str());
 printf("%s\n", ("belle"_strval).replace<'e', 'a'>().c_str());
 printf("%s\n", to_strval<42>::c_str());
-```
-
-## ros\_context
-A wrapper around ros.
-It provides a minimal of lazy methods for sending and receiving ros messages and service calls.
-
-Pub / sub example:
-
-### Reader
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_msgs/msg/int32.h>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_write");
-
-std_msgs::msg::Int32 msg;
-msg.data = 42;
-
-ros_context_write(msg, "/ex_ros_context");
-```
-
-### Writer
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_msgs/msg/int32.h>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_read");
-
-while(1)
-{
-  std_msgs::msg::Int32 msg;
-
-  int rc = ros_context_read(msg, "/ex_ros_context");
-
-  if (rc == 0)
-    printf("read: %d\n", msg.data);
-}
-```
-
-Serve / call example:
-
-### Server
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_srvs/srv/set_bool.hpp>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_serve");
-while(1)
-{
-  std_srvs::srv::SetBool srv;
-  srv.response.success = true;
-
-  int rc = ros_context_serve(srv, "ex_ros_context");
-
-  if (rc == 0)
-    printf("got: %d\n", srv_req.data);
-}
-```
-
-### Caller
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_srvs/srv/set_bool.hpp>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_serve");
-while(1)
-{
-  std_srvs::srv::SetBool srv;
-  srv.response.success = true;
-
-  std_srvs::srv::SetBool srv;
-  srv.request.data = true;
-
-  int rc = ros_context_call(srv, "/ex_ros_context_serve/ex_ros_context");
-
-  if (rc == 0)
-    printf("got: %d\n", srv.response.success);
-}
 ```
 
 ## ipc

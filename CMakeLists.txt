@@ -16,30 +16,12 @@ add_definitions(-DDEBUG)
 include_directories(${CMAKE_SOURCE_DIR})
 set(LD_FLAGS "-lpthread -lzmq -lprotobuf -lfmt -lrt -latomic")
 
-find_package(ament_cmake)
-find_package(rclcpp)
-find_package(std_msgs)
-find_package(std_srvs)
-find_package(builtin_interfaces)
 find_package(Boost COMPONENTS program_options filesystem REQUIRED)
-
-if("${rclcpp_FOUND}")
-  message(STATUS "ROS2 found")
-  set(LD_FLAGS "${LD_FLAGS} -lpthread")
-else()
-  message(STATUS "ROS2 not found")
-  add_definitions("-DNO_ROS")
-endif()
 
 file(GLOB CFILES "tyndall/*.c*" "tyndall/*/*.c*")
 add_library(tyndall SHARED ${CFILES})
 target_link_libraries(tyndall ${LD_FLAGS})
 install(TARGETS tyndall DESTINATION lib)
-
-if("${rclcpp_FOUND}")
-  # ROS 2 Lyrical dropped ament_target_dependencies(); link the exported targets.
-  target_link_libraries(tyndall ${rclcpp_TARGETS} ${builtin_interfaces_TARGETS} ${std_msgs_TARGETS} ${std_srvs_TARGETS})
-endif()
 
 file(GLOB HEADERS "tyndall/*.h*" "tyndall/*/*.h*")
 
@@ -48,8 +30,6 @@ foreach(HEADER ${HEADERS})
   install(FILES ${HEADER} DESTINATION include/${HEADER_DIR})
 endforeach(HEADER)
 
-execute_process(COMMAND bash "-c" "echo -n \"${rclcpp_LINK_DIRECTORIES}\" | sed -n -e 's/^.*\\(\\/opt\\)/\\1/p'" OUTPUT_VARIABLE PKGCONF_ROS_LIBLINK_PATH)
-set(PKGCONF_ROS_LIBLINK "-L${PKGCONF_ROS_LIBLINK_PATH}")
 set(PKGCONF_LD_FLAGS ${LD_FLAGS})
 configure_file(tyndall.pc.in tyndall.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/tyndall.pc DESTINATION lib/pkgconfig)
