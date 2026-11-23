@@ -4,7 +4,7 @@
 #include <tyndall/ipc/shmem.h>
 
 int main() {
-  const char *prefix = IPC_SHMEM_PREFIX;
+  const char *prefix = IPC_SHMEM_PREFIX "_";
 
   DIR *dir;
   struct dirent *ent;

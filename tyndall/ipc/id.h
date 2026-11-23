@@ -1,25 +1,23 @@
 #pragma once
+#include <cassert>
+#include <cstring>
 #include <string>
-#include <tyndall/meta/hash.h>
 #include <tyndall/meta/strval.h>
 
 #ifndef IPC_SHMEM_PREFIX
-//                              echo ipc | sha1sum  # more unique shared memory
-//                              names reduce the chance of name collisions
-#define IPC_SHMEM_PREFIX                                                       \
-  "ipc"                                                                        \
-  "1ef42bc4e0bbfeb0ac34bc3642732768cf6f77b7"
+#define IPC_SHMEM_PREFIX "tyn"
 #endif
 
-// Shared memory files all go in /dev/shm, so they need to be unique, and they
-// can't have folders. We take names that look like absolute paths, like
-// "/my-process/my_topic". We start with a prepend a constant unique prefix
-// (IPC_SHMEM_PREFIX), Then we add the id, without leading slashes, and with the
-// remaining slashes replaced with underscores. And lastly, we append a hash of
-// the the id without leading slashes, but with slashes. The last hash is to
-// distinguish between eg. my/topic and my_topic.
-
-// Note that "my-topic" gets the same id as "/my-topic" and "//my-topic" etc.
+// Shared memory objects share one flat namespace (/dev/shm on Linux), so a
+// topic, which looks like an absolute path, is turned into a file name: the
+// prefix IPC_SHMEM_PREFIX and '_', then the topic without its leading slashes
+// and with each remaining '/' replaced by '%':
+//
+//   "/my-process/my_topic" -> "tyn_my-process%my_topic"
+//
+// "my-topic", "/my-topic" and "//my-topic" are the same topic. A topic can't
+// contain '%' (ROS names can't either), so different topics get different
+// names. rust-ipc in libblunux builds the same names: change both together.
 
 // Compile time id generation:
 // Meant to take strval as template parameter.
@@ -28,22 +26,17 @@ using id_remove_leading_slashes =
     decltype(STRING::template remove_leading<'/'>());
 
 template <typename STRING>
-using id_hash = decltype(to_strval<hash_fnv1a_32<STRING>()>{});
+using id_replace_slashes = decltype(STRING::template replace<'/', '%'>());
 
-template <typename STRING>
-using id_replace_slashes_with_underscores =
-    decltype(STRING::template replace<'/', '_'>());
+template <typename ID> struct id_prepare_impl {
+  static_assert(ID::occurrences('%') == 0,
+                "'%' stands for '/' in shared memory names, so an id can't "
+                "contain it");
+  using type = decltype(create_strval(IPC_SHMEM_PREFIX) + "_"_strval +
+                        id_replace_slashes<id_remove_leading_slashes<ID>>{});
+};
 
-template <typename ID>
-using id_prepare =
-    decltype(create_strval(IPC_SHMEM_PREFIX) + "_"_strval +
-             id_replace_slashes_with_underscores<
-                 id_remove_leading_slashes<ID>>{}
-             // switch slashes with underscores
-             + "_"_strval + id_hash<id_remove_leading_slashes<ID>>{}
-             // hash id to prevent name clash between f.ex. /my/topic and
-             // my_topic
-    );
+template <typename ID> using id_prepare = typename id_prepare_impl<ID>::type;
 
 // runtime id generation
 template <typename STORAGE>
@@ -52,13 +45,14 @@ static inline std::string id_rtid_prepare(const char *id) {
   while (*id == '/')
     ++id;
 
-  std::string prepared_id = IPC_SHMEM_PREFIX "_" + std::string{id} + "_" +
-                            std::to_string(hash_fnv1a_32(id, strlen(id)));
+  // '%' stands for '/' in shared memory names, so an id can't contain it
+  assert(strchr(id, '%') == nullptr);
 
-  // replace slash with underscore
+  std::string prepared_id = IPC_SHMEM_PREFIX "_" + std::string{id};
+
   for (char &c : prepared_id)
     if (c == '/')
-      c = '_';
+      c = '%';
 
   return prepared_id;
 }
