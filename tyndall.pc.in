@@ -1,7 +1,6 @@
-rosliblink=@PKGCONF_ROS_LIBLINK@
 ldflags=@PKGCONF_LD_FLAGS@
 
 Name: tyndall
 Description: Blueye Robotics general C/C++ libraries
 Version: 0.1
-Libs: ${rosliblink} ${ldflags} -ltyndall
+Libs: ${ldflags} -ltyndall

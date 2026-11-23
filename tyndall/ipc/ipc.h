@@ -53,4 +53,6 @@ static inline int ipc_lazy_read(STORAGE &entry, ID, bool always_update_entry) {
 
 #endif
 
-static inline int ipc_cleanup() { return shmem_unlink_all(IPC_SHMEM_PREFIX); }
+static inline int ipc_cleanup() {
+  return shmem_unlink_all(IPC_SHMEM_PREFIX "_");
+}

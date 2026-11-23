@@ -24,15 +24,27 @@ const my_struct ref{
   do {                                                                         \
     if (!(cond)) {                                                             \
       ipc_cleanup();                                                           \
-      printf(__FILE__ ":" M_STRINGIFY(__LINE__) " "                            \
-                                                "Assertion failed: " #cond     \
-                                                "\n");                         \
+      /* not the format: shared memory names in cond contain '%' */            \
+      printf("%s\n",                                                           \
+             __FILE__ ":" M_STRINGIFY(__LINE__) " "                            \
+                                                "Assertion failed: " #cond);   \
       exit(1);                                                                 \
     }                                                                          \
   } while (0)
 
+// The shared memory names. rust-ipc builds the same ones.
+static_assert(id_prepare<strval_t("/controller/control_force")>{} ==
+              "tyn_controller%control_force"_strval);
+static_assert(id_prepare<strval_t("//controller/control_force")>{} ==
+              id_prepare<strval_t("controller/control_force")>{});
+
 int main() {
   ipc_cleanup();
+
+  check(id_rtid_prepare<int>("/controller/control_force") ==
+        "tyn_controller%control_force");
+  check(id_rtid_prepare<int>("fpscalc/main") == "tyn_fpscalc%main");
+  check(id_rtid_prepare<int>("/my/topic") != id_rtid_prepare<int>("/my_topic"));
   {
     {
       my_struct entry = ref;

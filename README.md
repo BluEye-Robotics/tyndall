@@ -16,8 +16,6 @@ gcc / c++20, cmake
 
 [Boost.Python](https://github.com/boostorg/python)
 
-[ROS (optional)](http://wiki.ros.org/ROS/Tutorials)
-
 ### Build
 ```
 mkdir build
@@ -58,88 +56,6 @@ printf("%s\n", ("belle"_strval).replace<'e', 'a'>().c_str());
 printf("%s\n", to_strval<42>::c_str());
 ```
 
-## ros\_context
-A wrapper around ros.
-It provides a minimal of lazy methods for sending and receiving ros messages and service calls.
-
-Pub / sub example:
-
-### Reader
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_msgs/msg/int32.h>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_write");
-
-std_msgs::msg::Int32 msg;
-msg.data = 42;
-
-ros_context_write(msg, "/ex_ros_context");
-```
-
-### Writer
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_msgs/msg/int32.h>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_read");
-
-while(1)
-{
-  std_msgs::msg::Int32 msg;
-
-  int rc = ros_context_read(msg, "/ex_ros_context");
-
-  if (rc == 0)
-    printf("read: %d\n", msg.data);
-}
-```
-
-Serve / call example:
-
-### Server
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_srvs/srv/set_bool.hpp>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_serve");
-while(1)
-{
-  std_srvs::srv::SetBool srv;
-  srv.response.success = true;
-
-  int rc = ros_context_serve(srv, "ex_ros_context");
-
-  if (rc == 0)
-    printf("got: %d\n", srv_req.data);
-}
-```
-
-### Caller
-
-```cpp
-#include <tyndall/ros_context.h>
-#include <std_srvs/srv/set_bool.hpp>
-
-ros_context::init(argc, argv, std::chrono::milliseconds{3}, "ex_ros_context_serve");
-while(1)
-{
-  std_srvs::srv::SetBool srv;
-  srv.response.success = true;
-
-  std_srvs::srv::SetBool srv;
-  srv.request.data = true;
-
-  int rc = ros_context_call(srv, "/ex_ros_context_serve/ex_ros_context");
-
-  if (rc == 0)
-    printf("got: %d\n", srv.response.success);
-}
-```
-
 ## ipc
 Inter process communication in Linux based on shared memory and lockless data structures.
 
@@ -148,8 +64,11 @@ Shared memory is created (if needed) and mapped in `ipc_write` and `ipc_read` on
 Lockless [seqlock](https://en.wikipedia.org/wiki/Seqlock) is used for synchronization.
 It supports a single writer and multiple readers.
 
+Each topic is a file in `/dev/shm`, named `tyn_` and the topic without its leading slashes, with `/` replaced by `%`: `/my_process/my_topic` is `/dev/shm/tyn_my_process%my_topic`.
+A topic can't contain `%`.
+
 Shared memory is left open on shutdown, so it gets reused on restart.
-You can remove the shared memory using `ipc_cleanup();` or `rm /dev/shm/ipc*`.
+You can remove the shared memory using `ipc_cleanup();` or `rm /dev/shm/tyn_*`.
 
 Example:
 
@@ -181,8 +100,8 @@ Full example in [examples/ipc/](examples/ipc/).
 The [ipc\_read](tools/ipc_read.cpp) tool can be used to print a topic, using the name or path:
 
 ```shell
-tyndall_tool_ipc_read ipc1ef42bc4e0bbfeb0ac34bc3642732768cf6f77b7_my_topic_891174619
-tyndall_tool_ipc_read /dev/shm/ipc1ef42bc4e0bbfeb0ac34bc3642732768cf6f77b7_my_topic_891174619
+tyndall_tool_ipc_read tyn_my_topic
+tyndall_tool_ipc_read /dev/shm/tyn_my_topic
 ```
 
 For [aggregate initializable](https://en.cppreference.com/w/cpp/language/aggregate_initialization) entry types, this will attempt to print the fields of the entry.
@@ -190,7 +109,7 @@ If the entry is not aggregate initializable, the hexadecimal representation of t
 You can still get a formatted print of non-aggregate-initializables by supplying the format yourself:
 
 ```shell
-tyndall_tool_ipc_read ipc1ef42bc4e0bbfeb0ac34bc3642732768cf6f77b7_my_topic_891174619 f
+tyndall_tool_ipc_read tyn_my_topic f
 ```
 
 The format is a list of type ids according to:
@@ -211,12 +130,12 @@ y = unsigned long long
 
 So to print a struct `struct S{ int a; unsigned char b; float c, d; S(){}}` you would run:
 ```shell
-tyndall_tool_ipc_read ipc1ef42bc4e0bbfeb0ac34bc3642732768cf6f77b7_my_topic_891174619 ihff
+tyndall_tool_ipc_read tyn_my_topic ihff
 ```
 
 Note that the entry is assumed to have standard alignment.
 
 You can ignore a specified amount of bytes in the struct by having a number in the format:
 ```shell
-tyndall_tool_ipc_read ipc1ef42bc4e0bbfeb0ac34bc3642732768cf6f77b7_my_topic_891174619 i8f
+tyndall_tool_ipc_read tyn_my_topic i8f
 ```
