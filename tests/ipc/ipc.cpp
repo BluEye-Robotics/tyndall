@@ -54,6 +54,10 @@ int main() {
     {
       my_struct entry = {};
       int rc = ipc_read(entry, "/test/standard");
+      if (rc != 0) {
+          perror("ipc_read failed");
+          std::cerr << "ipc_read returned error code: " << rc << std::endl;
+      }
       check(rc == 0);
       check(entry == ref);
     }
@@ -132,6 +136,40 @@ int main() {
       check(rc == 0);
       check(entry == ref);
     }
+  }
+
+  // macOS allows 31 characters in a shared memory name and shortens longer
+  // ones: topics that differ only after that point must stay apart, and the
+  // static and runtime ids must still agree.
+  {
+    my_struct other = ref;
+    other.a = 7;
+    ipc_write(ref, "/test/a_topic_longer_than_macos_allows/first");
+    ipc_write(other, "/test/a_topic_longer_than_macos_allows/second");
+
+    my_struct entry = {};
+    check(ipc_read(entry, "/test/a_topic_longer_than_macos_allows/first") == 0);
+    check(entry == ref);
+    check(ipc_rtid_read(entry,
+                        "/test/a_topic_longer_than_macos_allows/second") == 0);
+    check(entry == other);
+  }
+
+  // A segment that another process created and hasn't sized yet, or whose
+  // creator died before sizing it. macOS used to refuse mapping it.
+  {
+    const std::string name =
+        fix_shm_name(id_rtid_prepare<int>("/test/unsized").c_str());
+    shm_unlink(name.c_str());
+    int fd =
+        shm_open(name.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+    check(fd != -1);
+
+    ipc_rtid_write(ref, "/test/unsized");
+    my_struct entry = {};
+    check(ipc_rtid_read(entry, "/test/unsized") == 0);
+    check(entry == ref);
+    close(fd);
   }
 
   // moving

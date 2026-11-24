@@ -1,12 +1,21 @@
 #pragma once
-#include <dirent.h>
-#include <fcntl.h>
+
+#include <cerrno>
+#include <cstring>
 #include <iostream>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
+#include <string>
+
+#include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
+
+#ifdef __APPLE__
+#include <cstdio>
+#include <tyndall/meta/hash.h>
+#include "shmem_mac_ipc_names.h"
+#endif
 
 enum shmem_error {
   SHMEM_SHM_FAILED = 1,
@@ -14,9 +23,83 @@ enum shmem_error {
   SHMEM_MAP_FAILED,
 };
 
+#ifdef __APPLE__
+// macOS wants shm_open names to start with '/' and allows at most 31
+// characters (PSHMNAMLEN). A longer name keeps its start and ends in a hash of
+// the whole name, so that names with the same start stay apart.
+inline std::string fix_shm_name(const char *id) {
+  if (!id || id[0] == '\0') {
+    return {};
+  }
+  std::string name(id);
+  if (name[0] != '/') {
+    name = "/" + name;
+  }
+  constexpr size_t max_length = 31;
+  if (name.length() > max_length) {
+    char hash[10]; // '_' and 8 hex digits
+    snprintf(hash, sizeof hash, "_%08x",
+             hash_fnv1a_32(name.c_str(), name.length()));
+    name = name.substr(0, max_length - strlen(hash)) + hash;
+  }
+  return name;
+}
+#else
+inline std::string fix_shm_name(const char *id) {
+  if (!id || id[0] == '\0') {
+    return {};
+  }
+  return std::string(id);
+}
+#endif
+
 static inline int shmem_create(void **addr, const char *id, size_t size) {
-  // memfd_create
-  int fd = shm_open(id, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  std::string name = fix_shm_name(id);
+  if (name.empty()) {
+    std::cerr << "shmem_create error: id is null or empty\n";
+    return SHMEM_SHM_FAILED;
+  }
+
+#ifdef __APPLE__
+  // macOS sizes a shared memory object once: ftruncate() on one that already
+  // has a size fails. Whoever finds the object unsized sizes it: the process
+  // that created it, or one that opened it before its creator got to it or
+  // after the creator died. If another process got there first, its size
+  // stands. Mapping an unsized object fails.
+  int fd = shm_open(name.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+  const bool created = fd != -1;
+  if (fd == -1 && errno == EEXIST)
+    fd = shm_open(name.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
+  if (fd == -1) {
+    perror("shm_open");
+    return SHMEM_SHM_FAILED;
+  }
+
+  const off_t needed = static_cast<off_t>(size);
+  struct stat st;
+  if (fstat(fd, &st) != 0) {
+    perror("fstat");
+    close(fd);
+    return SHMEM_TRUNCATE_FAILED;
+  }
+  bool sized = false;
+  if (st.st_size < needed) {
+    sized = ftruncate(fd, needed) == 0;
+    const int truncate_errno = errno;
+    if (!sized && (fstat(fd, &st) != 0 || st.st_size < needed)) {
+      std::cerr << "shmem_create error: ftruncate " << name << ": "
+                << strerror(truncate_errno) << "\n";
+      close(fd);
+      return SHMEM_TRUNCATE_FAILED;
+    }
+  }
+
+  // Recorded after sizing, which keeps the time an object spends unsized
+  // short. One whose creator died unsized is recorded by whoever sized it.
+  if (created || sized)
+    append_ipc_name(name);
+#else
+  int fd = shm_open(name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (fd == -1)
     return SHMEM_SHM_FAILED;
 
@@ -25,6 +108,7 @@ static inline int shmem_create(void **addr, const char *id, size_t size) {
     close(fd);
     return SHMEM_TRUNCATE_FAILED;
   }
+#endif
 
   *addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   // The mapping keeps the shared memory object alive; the descriptor is not
@@ -41,32 +125,34 @@ static inline int shmem_unmap(void *addr, size_t size) {
 }
 
 static inline int shmem_unlink(const char *id) {
-  // shm_open cleanup
-  return shm_unlink(id);
+  if (!id || strlen(id) == 0) {
+    return -1;
+  }
+  std::string name = fix_shm_name(id);
+  if (name.empty()) {
+    return -1;
+  }
+  return shm_unlink(name.c_str());
 }
 
 static inline int shmem_unlink_all(const char *prefix) {
-  DIR *dir;
-  struct dirent *ent;
-  dir = opendir("/dev/shm");
-  if (dir == NULL)
-    return -1;
-
-  while ((ent = readdir(dir)) != NULL) {
-    const char *dir_name = ent->d_name;
-    int match = 1;
-
-    for (int i = 0; i < (int)strlen(prefix); ++i)
-      if (dir_name[i] != prefix[i])
-        match = 0;
-
-    if (match)
-      shmem_unlink(dir_name);
-  }
-
-  closedir(dir);
-
-  return 0;
+  #ifdef __APPLE__
+    return unlink_all_ipc_names();
+  #else
+    DIR *dir = opendir("/dev/shm");
+    if (dir == nullptr) {
+      return -1;
+    }
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != nullptr) {
+      const char *dir_name = ent->d_name;
+      if (strncmp(dir_name, prefix, strlen(prefix)) == 0) {
+        shmem_unlink(dir_name);
+      }
+    }
+    closedir(dir);
+    return 0;
+  #endif
 }
 
 #ifdef __cplusplus
@@ -275,4 +361,4 @@ public:
   }
 };
 
-#endif
+#endif // __cplusplus
